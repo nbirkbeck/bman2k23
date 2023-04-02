@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 
 #include "game.h"
+#include "bman_client.h"
 #include "level.grpc.pb.h"
 #include <iostream>
 #include <memory>
@@ -100,9 +101,8 @@ public:
     return player_texture_.Load() && explosion_texture_.Load();
   }
 
-  void Draw(const Game& game, SDL_Surface* dest) {
-    auto& game_state = game.game_state();
-    DrawBackground(game, dest);
+  void Draw(const bman::GameState& game_state, SDL_Surface* dest) {
+    DrawBackground(game_state, dest);
 
     for (const auto& player : game_state.players()) {
       player_texture_.Draw(player, dest);
@@ -126,11 +126,11 @@ public:
     }
   }
 
-  void DrawBackground(const Game& game, SDL_Surface* dest) {
+  void DrawBackground(const bman::GameState& game, SDL_Surface* dest) {
     SDL_BlitScaled(background_, nullptr, dest, nullptr);
-    for (int y = 0; y < game.config().level_height(); ++y) {
-      for (int x = 0; x < game.config().level_width(); ++x) {
-        SDL_Rect src_rect = {kOffsetX + 64 * game.IsStaticBrick(x, y), kOffsetY,
+    for (int y = 0; y < config_.level_height(); ++y) {
+      for (int x = 0; x < config_.level_width(); ++x) {
+        SDL_Rect src_rect = {kOffsetX + 64 * Game::IsStaticBrick(config_, x, y), kOffsetY,
                              kGridSize, kGridSize};
         SDL_Rect dest_rect = {kOffsetX + x * kGridSize,
                               kOffsetY + y * kGridSize, kGridSize, kGridSize};
@@ -164,7 +164,12 @@ public:
     SDL_BlitScaled(bomb_, &src_rect, dest, &dest_rect);
   }
 
+  void set_config(const bman::GameConfig& config) {
+    config_ = config;
+  }
+
 private:
+  bman::GameConfig config_;
   SDL_Surface* background_;
   SDL_Surface* bomb_;
   SDL_Surface* powerup_;
@@ -200,10 +205,17 @@ public:
       printf("Failed to create renderer: %s\n", SDL_GetError());
       exit(1);
     }
-
-    game_.BuildSimpleLevel(2);
-    game_.AddPlayer();
     game_renderer_.Load();
+    
+    client_ = bman::Client::Create();
+    if (client_) {
+      auto response = client_->Join("user");
+      game_renderer_.set_config(response.game_config());
+    } else {
+      game_.BuildSimpleLevel(2);
+      game_.AddPlayer();
+      game_renderer_.set_config(game_.config());
+    }
   }
 
   void Loop() {
@@ -231,10 +243,17 @@ public:
       }
       if (keys[move_keys[4]]) {
         action->set_place_bomb(true);
+        keys[move_keys[4]] = 0;
       }
-      game_.Step(moves);
-
-      game_renderer_.Draw(game_, SDL_GetWindowSurface(window_));
+      bman::GameState state;
+      if (client_) {
+        state = client_->MovePlayer(moves[0]).game_state();
+      } else {
+        game_.Step(moves);
+        state = game_.game_state();
+      }
+      
+      game_renderer_.Draw(state, SDL_GetWindowSurface(window_));
       SDL_UpdateWindowSurface(window_);
 
       usleep(1000 / 60.0 * 1000);
@@ -251,17 +270,13 @@ public:
 
       case SDL_KEYDOWN: {
         SDL_Keysym keysym = event.key.keysym;
-        std::cout << "Keyboard:" << (char)keysym.sym << "\n";
-        if (!keys[keysym.sym]) {
-        }
         keys[keysym.sym] = true;
-
         return 0;
       }
+
       case SDL_KEYUP: {
         SDL_Keysym keysym = event.key.keysym;
         keys[keysym.sym] = false;
-
         return 0;
       }
       default:
@@ -275,6 +290,7 @@ private:
   SDL_Window* window_;
   GameRenderer game_renderer_;
   Game game_;
+  std::unique_ptr<bman::Client> client_;
 };
 
 int main(int ac, char* av[]) {

@@ -83,14 +83,16 @@ public:
   void AddPlayer() {
     game_state_.add_score(0);
     auto* player = game_state_.add_players();
-    player->set_x(kSubpixelSize / 2);
-    player->set_y(kSubpixelSize / 2);
+    if (game_state_.players_size() == 1) {
+      player->set_x(kSubpixelSize / 2);
+      player->set_y(kSubpixelSize / 2);
+    } else if (game_state_.players_size() == 2) {
+      player->set_x(config_.level_width() * kSubpixelSize - kSubpixelSize / 2);
+      player->set_y(config_.level_height() * kSubpixelSize - kSubpixelSize / 2);
+    }
     player->set_num_bombs(config_.player_config().num_bombs());
     player->set_health(config_.player_config().health());
     player->set_strength(config_.player_config().strength());
-    // auto* player1 = game_state_.add_players();
-    // player1->set_x(kDefaultWidth * kSubPixelSize - kSubpixelSize / 2);
-    // player1->set_y(kSubpixelSize / 2);
   }
 
   const bman::GameConfig& config() const { return config_; }
@@ -98,7 +100,7 @@ public:
   bman::GameState& game_state() { return game_state_; }
 
   bool Step(const std::vector<bman::MovePlayerRequest>& move_requests) {
-    if (move_requests.size() != game_state_.players_size()) {
+    if ((int)move_requests.size() != (int)game_state_.players_size()) {
       LOG(ERROR) << "Move request has invalid number of players";
       return false;
     }
@@ -238,6 +240,7 @@ public:
               bomb.set_y(cur_y);
               bomb.set_strength(player->strength());
               bomb.set_timer(kDefaultBombTimer + 1);
+              bomb.set_player_id(player_index);
               player->set_num_used_bombs(player->num_used_bombs() + 1);
             }
           }
@@ -387,11 +390,16 @@ public:
   }
 
   bool IsStaticBrick(int x, int y) const {
-    if (x < 0 || y < 0 || x >= config_.level_width() ||
-        y >= config_.level_height())
+    return IsStaticBrick(config_, x, y);
+  }
+
+  static bool IsStaticBrick(const bman::GameConfig& config, int x, int y) {
+    if (x < 0 || y < 0 || x >= config.level_width() ||
+        y >= config.level_height())
       return true;
     return (x % 2 == 1 && y % 2 == 1);
   }
+
 
 protected:
   int32_t clock_ = 0;
