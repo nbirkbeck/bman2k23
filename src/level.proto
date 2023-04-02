@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package bman;
+
+enum Direction {
+  DIR_LEFT = 0;
+  DIR_RIGHT = 1;
+  DIR_UP = 2;
+  DIR_DOWN = 3;
+}
+
+enum Powerup {
+  PUP_NONE = 0;
+  PUP_FLAME = 1;
+  PUP_EXTRA_BOMB = 2;
+  PUP_KICK = 3;
+  PUP_SPEED = 4;
+  PUP_PUNCH = 5;
+  PUP_DEATH = 6;
+  PUP_DETONATOR = 7;
+}
+
+message PlayerState {
+  optional int32 x = 1;
+  optional int32 y = 2;
+  optional Direction dir = 3;
+  optional int32 anim_counter = 4;
+  optional int32 num_bombs = 5;
+  optional int32 num_used_bombs = 9;
+  optional int32 strength = 6;
+  optional bool has_detonator = 7;
+  optional int32 health = 8;
+}
+
+message LevelState {
+  message Brick {
+    optional int32 x = 1;
+    optional int32 y = 2;
+    optional bool solid = 3;
+    optional Powerup powerup = 4;
+  }
+  repeated Brick bricks = 1;
+
+  message Bomb {
+    optional int32 x = 1;
+    optional int32 y = 2;
+    optional int32 strength = 3;
+    optional int32 player_id = 4;
+    optional int32 timer = 5;
+  }
+  repeated Bomb bombs = 2;
+
+  message Explosion {
+    message Point {
+      optional int32 x = 1;
+      optional int32 y = 2;
+      optional bool bomb_center = 3;
+    }
+    repeated Point points = 1;
+    optional int32 timer = 2;
+  }
+  repeated Explosion explosions = 3;
+}
+
+message GameState {
+  repeated int32 score = 1;
+
+  optional int32 clock = 2;
+
+  repeated PlayerState players = 3;
+
+  optional LevelState level = 4;
+}
+
+message GameConfig {
+  message PlayerConfig {
+    optional int32 num_bombs = 1;
+    optional int32 strength = 2;
+    optional int32 max_players = 3;
+    optional int32 health = 4;
+  }
+  optional int32 level_width = 1;
+  optional int32 level_height = 2;
+  optional LevelState level_state = 3;
+  optional PlayerConfig player_config = 4;
+}
+
+message MovePlayerRequest {
+  optional PlayerState previous_state = 1;
+
+  message Action {
+    optional int32 clock = 1;
+    optional int32 dx = 2;
+    optional int32 dy = 3;
+    optional Direction dir = 4;
+    optional bool place_bomb = 5;
+  }
+
+  repeated Action actions = 2;
+}
+
+message MovePlayerResponse {
+  optional GameState game_state = 1;
+}
+
+message JoinRequest {
+  optional string game_id = 1;
+  optional string user_name = 2;
+}
+
+message JoinResponse {
+  optional string status_message = 1;
+  optional GameConfig game_config = 2;
+}
+
+
+// The greeting service definition.
+service BManService {
+  rpc Join (JoinRequest) returns (JoinResponse) {}
+  rpc MovePlayer(MovePlayerRequest) returns (MovePlayerResponse) {}
+}
