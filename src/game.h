@@ -51,7 +51,7 @@ public:
     config_.set_level_height(kDefaultHeight);
     auto* player_config = config_.mutable_player_config();
     player_config->set_num_bombs(2);
-    player_config->set_strength(2);
+    player_config->set_strength(1);
     player_config->set_max_players(4);
     player_config->set_health(1);
 
@@ -131,7 +131,6 @@ public:
       const bool active = bomb.timer() > 0;
       bomb.set_timer(bomb.timer() - 1);
       if (active && bomb.timer() <= 0) {
-        LOG(INFO) << "Exploding bomb!";
         auto* explosion = game_state_.mutable_level()->add_explosions();
         ExplodeBomb(bomb_map, brick_map, &bomb, explosion);
       }
