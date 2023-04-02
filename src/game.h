@@ -8,6 +8,8 @@
 #include <memory>
 #include <unordered_map>
 
+#include "point.h"
+
 const int kDefaultWidth = 17;
 const int kDefaultHeight = 13;
 
@@ -21,12 +23,15 @@ struct PointHash {
   size_t operator()(const std::pair<int32_t, int32_t>& point) const {
     return point.first * 1024 + point.second;
   }
+  size_t operator()(const Point2i& point) const {
+    return point.x * 1024 + point.y;
+  }
 };
 
-typedef std::unordered_map<std::pair<int32_t, int32_t>,
+typedef std::unordered_map<Point2i,
                            bman::LevelState::Bomb*,
                            PointHash> BombMap;
-typedef std::unordered_map<std::pair<int32_t, int32_t>,
+typedef std::unordered_map<Point2i,
                            bman::LevelState::Brick*,
                            PointHash> BrickMap;
 
@@ -108,7 +113,7 @@ public:
     BombMap bomb_map = MakeBombMap();
     BrickMap brick_map;
     for (auto& brick : *game_state_.mutable_level()->mutable_bricks()) {
-      brick_map[std::make_pair(brick.x(), brick.y())] = &brick;
+      brick_map[Point2i(brick.x(), brick.y())] = &brick;
     }
 
     // Apply any player actions (e.g., move, drop bomb, etc.)
@@ -152,113 +157,73 @@ public:
     for (auto& move : move_requests) {
       for (auto& action : move.actions()) {
         auto* player = game_state_.mutable_players(player_index);
-        int dx = action.dx(), dy = action.dy();
-        int min_dx = 0, min_dy = 0;
+        const Point2i delta(action.dx(), action.dy());
+        Point2i min_delta(0, 0);
         int x = player->x(), y = player->y();
-        int other_x = 0;
-        int other_y = 0;
-        const int cur_x = GridRound(x);
-        const int cur_y = GridRound(y);
+        Point2i other(0, 0);
+        const Point2i cur(GridRound(x), GridRound(y));
 
-        if (dx > 0 || dx < 0) {
+        if (abs(delta.x)) {
           const int test_x =
-              x + dx + sign(dx) * (kSubPixelSize / 2 - kMovePadding);
-          other_x = GridRound(test_x);
-          other_y = GridRound(y);
-          min_dx = (dx > 0)
-                       ? std::max(0, cur_x * kSubPixelSize + kSubPixelSize / 2 +
+              x + delta.x + sign(delta.x) * (kSubPixelSize / 2 - kMovePadding);
+          other.x = GridRound(test_x);
+          other.y = GridRound(y);
+          min_delta.x = (delta.x > 0)
+                       ? std::max(0, cur.x * kSubPixelSize + kSubPixelSize / 2 +
                                          kMovePadding - x)
-                       : std::min(0, cur_x * kSubPixelSize + kSubPixelSize / 2 -
+                       : std::min(0, cur.x * kSubPixelSize + kSubPixelSize / 2 -
                                          kMovePadding - x);
-        } else if (dy > 0 || dy < 0) {
+        } else if (abs(delta.y)) {
           const int test_y =
-              y + dy + sign(dy) * (kSubPixelSize / 2 - kMovePadding);
-          other_y =  GridRound(test_y);
-          other_x = GridRound(x);
-          min_dy = (dy > 0)
-                       ? std::max(0, cur_y * kSubPixelSize + kSubPixelSize / 2 +
+              y + delta.y + sign(delta.y) * (kSubPixelSize / 2 - kMovePadding);
+          other.y =  GridRound(test_y);
+          other.x = GridRound(x);
+          min_delta.y = (delta.y > 0)
+                       ? std::max(0, cur.y * kSubPixelSize + kSubPixelSize / 2 +
                                          kMovePadding - y)
-                       : std::min(0, cur_y * kSubPixelSize + kSubPixelSize / 2 -
+                       : std::min(0, cur.y * kSubPixelSize + kSubPixelSize / 2 -
                                          kMovePadding - y);
         }
         const bool can_move =
-            !IsStaticBrick(other_x, other_y) &&
-            (!brick_map.count(std::make_pair(other_x, other_y)) ||
-             !brick_map.at(std::make_pair(other_x, other_y))->solid()) &&
-            (!bomb_map.count(std::make_pair(other_x, other_y)) ||
-             (other_x == cur_x && other_y == cur_y));
+          (!IsStaticBrick(other.x, other.y) &&
+           (!brick_map.count(other) ||
+            !brick_map.at(other)->solid()) &&
+           !bomb_map.count(other)) ||
+          (other == cur);
 
-        player->set_x(x + (can_move ? dx : min_dx));
-        player->set_y(y + (can_move ? dy : min_dy));
+        player->set_x(x + (can_move ? delta.x : min_delta.x));
+        player->set_y(y + (can_move ? delta.y : min_delta.y));
         if (action.has_dir()) {
           player->set_anim_counter(player->anim_counter() + 1);
           player->set_dir(action.dir());
         } else {
           player->set_anim_counter(0);
         }
-        int new_x = GridRound(player->x());
-        int new_y = GridRound(player->y());
 
         // Move player closer to the square that they've moved into
-        if (new_x != cur_x || new_y != cur_y) {
-          if (abs(dx)) {
-            const int delta =
-                player->y() - (new_y * kSubpixelSize + kSubpixelSize / 2);
-            int update_y = SignedMin(-delta, dx);
-            player->set_y(player->y() + update_y);
-          } else if (abs(dy)) {
-            const int delta =
-                player->x() - (new_x * kSubpixelSize + kSubpixelSize / 2);
-            int update_x = SignedMin(-delta, dy);
-            player->set_x(player->x() + update_x);
+        const Point2i new_pt(GridRound(player->x()), GridRound(player->y()));
+        if (new_pt != cur) {
+          if (abs(delta.x)) {
+            const int d =
+                player->y() - (new_pt.y * kSubpixelSize + kSubpixelSize / 2);
+            player->set_y(player->y() + SignedMin(-d, delta.x));
+          } else if (abs(delta.y)) {
+            const int d =
+                player->x() - (new_pt.x * kSubpixelSize + kSubpixelSize / 2);
+            player->set_x(player->x() + SignedMin(-d, delta.y));
           }
         }
 
+        // If player wants to place a bomb, do it
         if (action.place_bomb()) {
-          LOG(INFO) << "num_used=" << player->num_used_bombs()
-                    << " num_bombs=" << player->num_bombs() << std::endl;
-          if (player->num_used_bombs() < player->num_bombs()) {
-            if (!bomb_map.count(std::make_pair(cur_x, cur_y)) &&
-                !brick_map.count(std::make_pair(cur_x, cur_y))) {
-              new_bombs.resize(new_bombs.size() + 1);
-              auto& bomb = new_bombs.back();
-              bomb.set_x(cur_x);
-              bomb.set_y(cur_y);
-              bomb.set_strength(player->strength());
-              bomb.set_timer(kDefaultBombTimer + 1);
-              bomb.set_player_id(player_index);
-              player->set_num_used_bombs(player->num_used_bombs() + 1);
-            }
+          if (!bomb_map.count(cur) && !brick_map.count(cur)) {
+            PlayerTryPlaceBomb(new_bombs, player, player_index, cur);
           }
         }
 
-        auto new_point =
-            std::make_pair(GridRound(player->x()), GridRound(player->y()));
-        if (brick_map.count(new_point)) {
-          if (!brick_map.at(new_point)->solid()) {
-            auto* brick = brick_map.at(new_point);
-            if (brick->has_powerup()) {
-              LOG(INFO) << "Brick has a powerup.";
-              switch (brick->powerup()) {
-              case bman::PUP_NONE:
-                break;
-              case bman::PUP_EXTRA_BOMB:
-                player->set_num_bombs(player->num_bombs() + 1);
-                break;
-              case bman::PUP_FLAME:
-                player->set_strength(player->strength() + 1);
-                break;
-              case bman::PUP_KICK:
-                break;
-              case bman::PUP_DETONATOR:
-                player->set_has_detonator(true);
-                break;
-              default:
-                break;
-              }
-              brick->clear_powerup();
-            }
-          }
+        // If player is over a power-up, give it to them.
+        if (brick_map.count(new_pt)) {
+          PlayerGivePowerup(player, brick_map.at(new_pt));
         }
       }
       player_index++;
@@ -266,10 +231,51 @@ public:
     return new_bombs;
   }
 
+  void PlayerGivePowerup(bman::PlayerState* player,
+                         bman::LevelState::Brick* brick) {
+    if (!brick->solid()) {
+      if (brick->has_powerup()) {
+        switch (brick->powerup()) {
+        case bman::PUP_NONE:
+          break;
+        case bman::PUP_EXTRA_BOMB:
+          player->set_num_bombs(player->num_bombs() + 1);
+          break;
+        case bman::PUP_FLAME:
+          player->set_strength(player->strength() + 1);
+          break;
+        case bman::PUP_KICK:
+          break;
+        case bman::PUP_DETONATOR:
+          player->set_has_detonator(true);
+          break;
+        default:
+          break;
+        }
+        brick->clear_powerup();
+      }
+    }
+  }
+  void PlayerTryPlaceBomb(std::vector<bman::LevelState::Bomb>& new_bombs,
+                          bman::PlayerState* player,
+                          int player_index,
+                          const Point2i& cur) {
+    if (player->num_used_bombs() < player->num_bombs()) {
+      new_bombs.resize(new_bombs.size() + 1);
+      auto& bomb = new_bombs.back();
+      bomb.set_x(cur.x);
+      bomb.set_y(cur.y);
+      bomb.set_strength(player->strength());
+      bomb.set_timer(kDefaultBombTimer + 1);
+      bomb.set_player_id(player_index);
+      player->set_num_used_bombs(player->num_used_bombs() + 1);
+    }
+  }
+
   BombMap MakeBombMap() {
     BombMap bomb_map;
     for (auto& bomb : *game_state_.mutable_level()->mutable_bombs()) {
-      bomb_map[std::make_pair(bomb.x(), bomb.y())] = &bomb;
+      bomb_map[Point2i(bomb.x(), bomb.y())] = &bomb;
     }
     return bomb_map;
   }
@@ -304,7 +310,6 @@ public:
   void ExplodeBomb(const BombMap& bomb_map, BrickMap& brick_map,
                    bman::LevelState::Bomb* bomb,
                    bman::LevelState::Explosion* explosion) {
-    LOG(INFO) << "Exploding bomb\n";
     bomb->set_timer(0); // Marks bomb as inactive
 
     // Give the player back a bomb
@@ -326,14 +331,14 @@ public:
       const int dy = sign * (!(dir & 0x1));
 
       for (int i = 1; i <= bomb->strength(); ++i) {
-        auto point = std::make_pair(bomb->x() + dx * i, bomb->y() + dy * i);
-        if (IsStaticBrick(point.first, point.second))
+        auto point = Point2i(bomb->x() + dx * i, bomb->y() + dy * i);
+        if (IsStaticBrick(point.x, point.y))
           break;
 
         // Track the point in the explosion.
         p = explosion->add_points();
-        p->set_x(point.first);
-        p->set_y(point.second);
+        p->set_x(point.x);
+        p->set_y(point.y);
 
         // Do damage to players
         for (auto& player : *game_state_.mutable_players()) {
@@ -341,8 +346,8 @@ public:
           const int min_y = GridRound(player.y() - kSubpixelSize / 2);
           const int max_x = GridRound(player.x() + kSubpixelSize / 2 - 1);
           const int max_y = GridRound(player.y() + kSubpixelSize / 2 - 1);
-          if (min_x <= point.first && point.first <= max_x &&
-              min_y <= point.second && point.second <= max_y) {
+          if (min_x <= point.x && point.x <= max_x &&
+              min_y <= point.y && point.y <= max_y) {
             player.set_health(player.health() - 1);
             if (player.health() < 0) {
               // TODO: kill player and respawn

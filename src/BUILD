@@ -26,9 +26,14 @@ cpp_grpc_library(
 )
 
 cc_library(
+   name = "point",
+   srcs = ["point.h"],
+)
+
+cc_library(
    name = "game",
    srcs = ["game.h"],
-   deps = [":level_proto_cc"],
+   deps = [":level_proto_cc", ":point"],
 )
 
 cc_test(
