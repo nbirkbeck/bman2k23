@@ -151,25 +151,20 @@ public:
     int player_index = 0;
     for (auto& move : move_requests) {
       for (auto& action : move.actions()) {
-        int dx = action.dx();
-        int dy = action.dy();
-        int min_dx = 0, min_dy = 0;
         auto* player = game_state_.mutable_players(player_index);
-        int x = player->x();
-        int y = player->y();
-        int other_x[2] = {0, 0};
-        int other_y[2] = {0, 0};
+        int dx = action.dx(), dy = action.dy();
+        int min_dx = 0, min_dy = 0;
+        int x = player->x(), y = player->y();
+        int other_x = 0;
+        int other_y = 0;
         const int cur_x = GridRound(x);
         const int cur_y = GridRound(y);
 
         if (dx > 0 || dx < 0) {
           const int test_x =
               x + dx + sign(dx) * (kSubPixelSize / 2 - kMovePadding);
-          const int test_y1 = y - kSubPixelSize / 4;
-          const int test_y2 = y + kSubPixelSize / 4;
-          other_x[0] = other_x[1] = GridRound(test_x);
-          other_y[0] = GridRound(test_y1);
-          other_y[1] = GridRound(test_y2);
+          other_x = GridRound(test_x);
+          other_y = GridRound(y);
           min_dx = (dx > 0)
                        ? std::max(0, cur_x * kSubPixelSize + kSubPixelSize / 2 +
                                          kMovePadding - x)
@@ -178,11 +173,8 @@ public:
         } else if (dy > 0 || dy < 0) {
           const int test_y =
               y + dy + sign(dy) * (kSubPixelSize / 2 - kMovePadding);
-          const int test_x1 = x - kSubPixelSize / 4;
-          const int test_x2 = x + kSubPixelSize / 4;
-          other_y[0] = other_y[1] = GridRound(test_y);
-          other_x[0] = GridRound(test_x1);
-          other_x[1] = GridRound(test_x2);
+          other_y =  GridRound(test_y);
+          other_x = GridRound(x);
           min_dy = (dy > 0)
                        ? std::max(0, cur_y * kSubPixelSize + kSubPixelSize / 2 +
                                          kMovePadding - y)
@@ -190,16 +182,11 @@ public:
                                          kMovePadding - y);
         }
         const bool can_move =
-            !IsStaticBrick(other_x[0], other_y[0]) &&
-            !IsStaticBrick(other_x[1], other_y[1]) &&
-            (!brick_map.count(std::make_pair(other_x[0], other_y[0])) ||
-             !brick_map.at(std::make_pair(other_x[0], other_y[0]))->solid()) &&
-            (!brick_map.count(std::make_pair(other_x[1], other_y[1])) ||
-             !brick_map.at(std::make_pair(other_x[1], other_y[1]))->solid()) &&
-            (!bomb_map.count(std::make_pair(other_x[0], other_y[0])) ||
-             (other_x[0] == cur_x && other_y[0] == cur_y)) &&
-            (!bomb_map.count(std::make_pair(other_x[1], other_y[1])) ||
-             (other_x[1] == cur_x && other_y[1] == cur_y));
+            !IsStaticBrick(other_x, other_y) &&
+            (!brick_map.count(std::make_pair(other_x, other_y)) ||
+             !brick_map.at(std::make_pair(other_x, other_y))->solid()) &&
+            (!bomb_map.count(std::make_pair(other_x, other_y)) ||
+             (other_x == cur_x && other_y == cur_y));
 
         player->set_x(x + (can_move ? dx : min_dx));
         player->set_y(y + (can_move ? dy : min_dy));
@@ -215,7 +202,7 @@ public:
         // Move player closer to the square that they've moved into
         if (new_x != cur_x || new_y != cur_y) {
           if (abs(dx)) {
-            int delta =
+            const int delta =
                 player->y() - (new_y * kSubpixelSize + kSubpixelSize / 2);
             int update_y = SignedMin(-delta, dx);
             player->set_y(player->y() + update_y);
@@ -334,21 +321,12 @@ public:
     p->set_y(bomb->y());
     p->set_bomb_center(true);
     for (int dir = 0; dir < 4; ++dir) {
-
       const int sign = dir < 2 ? 1 : -1;
       const int dx = sign * (dir & 0x1);
       const int dy = sign * (!(dir & 0x1));
 
       for (int i = 1; i <= bomb->strength(); ++i) {
         auto point = std::make_pair(bomb->x() + dx * i, bomb->y() + dy * i);
-        if (point.first < 0)
-          break;
-        if (point.second < 0)
-          break;
-        if (point.first >= config_.level_width())
-          break;
-        if (point.second >= config_.level_height())
-          break;
         if (IsStaticBrick(point.first, point.second))
           break;
 
