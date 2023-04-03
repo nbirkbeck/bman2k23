@@ -13,10 +13,11 @@ using bman::JoinRequest;
 using bman::JoinResponse;
 using bman::MovePlayerRequest;
 using bman::MovePlayerResponse;
-using grpc::Channel;
 using grpc::ClientContext;
+using grpc::Channel;
 using grpc::Status;
 
+// A client connection to the server (manages game_id and player_index)
 class Client {
 public:
   Client(std::shared_ptr<Channel> channel)
@@ -24,7 +25,8 @@ public:
 
   JoinResponse Join(const std::string& user);
   MovePlayerResponse MovePlayer(MovePlayerRequest& request);
-  static std::unique_ptr<Client> Create();
+
+  static std::unique_ptr<Client> Create(const std::string& server);
 
  private:
   std::unique_ptr<bman::BManService::Stub> stub_;

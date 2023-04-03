@@ -11,12 +11,14 @@
 #include <grpcpp/ext/proto_server_reflection_plugin.h>
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/health_check_service_interface.h>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 
 #include "game.h"
 #include <memory>
 #include <pthread.h>
 
-// ABSL_FLAG(int, port, 8888, "Count of items to process");
+DEFINE_int32(port, 8888, "Count of items to process");
 
 using grpc::Server;
 using grpc::ServerBuilder;
@@ -112,16 +114,14 @@ public:
       games[request->game_id()].reset(new GameRunner);
       games[request->game_id()]->Start();
     }
+    LOG(INFO) << "Player " << request->user_name() << " has connected as player="
+              << num_clients_;
     reply->set_status_message(
         absl::StrFormat("Hello %s %d", request->user_name(), num_clients_));
     reply->set_player_index(num_clients_);
     *reply->mutable_game_config() = games[request->game_id()]->AddPlayer();
     
     ++num_clients_;
-    if (num_clients_ == 1) {
-
-    }
-    std::cout << num_clients_ << "\n";
     return Status::OK;
   }
 
@@ -130,12 +130,10 @@ public:
                     MovePlayerResponse* response) {
     if (!games[request->game_id()]) return Status::OK;
 
-   //std::vector<bman::MovePlayerRequest> move_requests;
-   //    move_requests.push_back(*request);
-
+    // Push the move request and return whatever the current game state is
     games[request->game_id()]->PushRequest(*request);
-
     games[request->game_id()]->GetState(response->mutable_game_state());
+
     return Status::OK;
   }
   
@@ -160,7 +158,7 @@ void RunServer(uint16_t port) {
 }
 
 int main(int argc, char** argv) {
-  //  absl::ParseCommandLine(argc, argv);
-  RunServer(8889); // absl::GetFlag(FLAGS_port));
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  RunServer(FLAGS_port);
   return 0;
 }

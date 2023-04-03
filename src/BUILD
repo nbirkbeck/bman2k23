@@ -51,6 +51,7 @@ cc_binary(
     deps = [
         ":level_proto_cc",
         ":game",
+        "@gflags//:lib",
     ],
 )
 
@@ -71,6 +72,7 @@ cc_binary(
     defines = ["BAZEL_BUILD"],
     linkopts = ['-lSDL2  -lglog'],
     deps = [
+        "@gflags//:lib",
         ":level_proto_cc",
         ":game",
         ":bman_client",

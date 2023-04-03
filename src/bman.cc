@@ -6,15 +6,20 @@
 #include <iostream>
 #include <memory>
 #include <unordered_map>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 480
+static constexpr int kScreenWidth = 640;
+static constexpr int kScreenHeight = 480;
+static constexpr int kGridSize = 32;
+static constexpr int kOffsetX = 48;
+static constexpr int kOffsetY = 32;
 
-const int kGridSize = 32;
-const int kOffsetX = 48;
-const int kOffsetY = 32;
-std::unordered_map<int, int> keys;
+DEFINE_string(username, "[name]", "User name to use when connecting to server");
+DEFINE_string(server, "", "Server to connect to (with :port)");
 
+ 
+// A class to help manage the Player texture.
 class PlayerTexture {
 public:
   bool Load() {
@@ -40,6 +45,7 @@ public:
   SDL_Surface* surface_;
 };
 
+// A class to help manage the Explosion texture.
 class ExplosionTexture {
 public:
   bool Load() {
@@ -48,11 +54,12 @@ public:
     return true;
   }
   void Draw(const bman::LevelState::Explosion& explosion, SDL_Surface* dest) {
-    std::unordered_map<std::pair<int32_t, int32_t>, bool, PointHash> exp_map;
+    std::unordered_map<Point2i, int, PointHash> exp_map;
     for (const auto& p : explosion.points()) {
-      exp_map[std::make_pair(p.x(), p.y())] = 1;
+      exp_map[Point2i(p.x(), p.y())] = 1;
     }
 
+    // Animate the explosion width using the timer
     int y_offset =
         (8 * (kExplosionTimer - explosion.timer())) / kExplosionTimer;
     if (y_offset >= 4) {
@@ -60,27 +67,19 @@ public:
     }
 
     for (const auto& p : explosion.points()) {
-      const bool left = exp_map[std::make_pair(p.x() - 1, p.y())];
-      const bool right = exp_map[std::make_pair(p.x() + 1, p.y())];
-      const bool up = exp_map[std::make_pair(p.x(), p.y() - 1)];
-      const bool down = exp_map[std::make_pair(p.x(), p.y() + 1)];
-      const bool corner = (left || right) && (up || down);
-      int x_offset = 2;
-      if (p.bomb_center() || corner) {
-        x_offset = 2;
-      } else if (left && right) {
-        x_offset = 1;
-      } else if (right) {
-        x_offset = 0;
-      } else if (left) {
-        x_offset = 3;
-      } else if (up && down) {
-        x_offset = 6;
-      } else if (up) {
-        x_offset = 4;
-      } else if (down) {
-        x_offset = 5;
-      }
+      const int left = exp_map[Point2i(p.x() - 1, p.y())];
+      const int right = exp_map[Point2i(p.x() + 1, p.y())];
+      const int up = exp_map[Point2i(p.x(), p.y() - 1)];
+      const int down = exp_map[Point2i(p.x(), p.y() + 1)];
+      const int index = left | (right << 1) | (up << 2) | (down << 3);
+      static const int mapping[16] = {
+        2, 3, 0, 1, /* none, left, right, left+right */
+        4, 2, 2, 2, /* up, up+left, up+right, up+left+right */
+        5, 2, 2, 2, /* down, down+left, down+right, down+left+right*/
+        6, 2, 2, 2, /* up+down, up+down+left, ... */
+      };
+      const int x_offset = p.bomb_center() ? 2 : mapping[index];
+
       SDL_Rect src_rect = {x_offset * kGridSize, y_offset * kGridSize,
                            kGridSize, kGridSize};
       SDL_Rect dest_rect = {kOffsetX + p.x() * kGridSize,
@@ -156,7 +155,7 @@ public:
   }
 
   void DrawBomb(const bman::LevelState::Bomb& bomb, SDL_Surface* dest) {
-    SDL_Rect src_rect = {0 + kGridSize * ((bomb.timer() / 16) % 4), 0,
+    SDL_Rect src_rect = {kGridSize * ((bomb.timer() / 16) % 4), 0,
                          kGridSize, kGridSize};
     SDL_Rect dest_rect = {kOffsetX + bomb.x() * kGridSize,
                           kOffsetY + bomb.y() * kGridSize, kGridSize,
@@ -183,18 +182,15 @@ public:
     const int renderer_flags = SDL_RENDERER_SOFTWARE, window_flags = 0;
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
-      printf("Couldn't initialize SDL: %s\n", SDL_GetError());
-      exit(1);
+      LOG(FATAL) << "Couldn't initialize SDL:" << SDL_GetError();
     }
 
     window_ = SDL_CreateWindow("Shooter 01", SDL_WINDOWPOS_UNDEFINED,
-                               SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH,
-                               SCREEN_HEIGHT, window_flags);
+                               SDL_WINDOWPOS_UNDEFINED, kScreenWidth,
+                               kScreenHeight, window_flags);
 
     if (!window_) {
-      printf("Failed to open %d x %d window: %s\n", SCREEN_WIDTH, SCREEN_HEIGHT,
-             SDL_GetError());
-      exit(1);
+      LOG(FATAL) << "Failed to open window:" << SDL_GetError();
     }
 
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
@@ -202,14 +198,16 @@ public:
     sdl_renderer_ = SDL_CreateRenderer(window_, -1, renderer_flags);
 
     if (!sdl_renderer_) {
-      printf("Failed to create renderer: %s\n", SDL_GetError());
-      exit(1);
+      LOG(FATAL) << "Failed to create renderer:" << SDL_GetError();
     }
-    game_renderer_.Load();
+
+    if (!game_renderer_.Load()) {
+      LOG(FATAL) << "Failed to load the renderer";
+    }
     
-    client_ = bman::Client::Create();
-    if (client_) {
-      auto response = client_->Join("user");
+    if (!FLAGS_server.empty()) {
+      client_ = bman::Client::Create(FLAGS_server);
+      auto response = client_->Join(FLAGS_username);
       game_renderer_.set_config(response.game_config());
     } else {
       game_.BuildSimpleLevel(2);
@@ -222,29 +220,13 @@ public:
     while (true) {
       HandleInput();
 
-      // Process input
-      char move_keys[5] = {'a', 'd', 'w', 's', ' '};
-      int dir = -1;
-      for (int i = 0; i < 4; ++i) {
-        if (keys[move_keys[i]]) {
-          dir = i;
-          break;
-        }
-      }
-      int dirs[4][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+      // Process input to get user action.
+      std::vector<bman::MovePlayerRequest> moves = {
+        GetPlayerActionFromKeyboard()
+      };
 
-      std::vector<bman::MovePlayerRequest> moves(1);
-      auto* action = moves[0].add_actions();
-      if (dir >= 0) {
-        int speed = 4;
-        action->set_dir(static_cast<bman::Direction>(dir));
-        action->set_dx(speed * dirs[dir][0]);
-        action->set_dy(speed * dirs[dir][1]);
-      }
-      if (keys[move_keys[4]]) {
-        action->set_place_bomb(true);
-        keys[move_keys[4]] = 0;
-      }
+      // Send the move to server (or advance local game) and get
+      // game state so we can render it.
       bman::GameState state;
       if (client_) {
         state = client_->MovePlayer(moves[0]).game_state();
@@ -256,10 +238,39 @@ public:
       game_renderer_.Draw(state, SDL_GetWindowSurface(window_));
       SDL_UpdateWindowSurface(window_);
 
+      // TODO(birkbeck): This targets 60hz, should take into account
+      // time spendt in rendering.
       usleep(1000 / 60.0 * 1000);
     }
   }
 
+  bman::MovePlayerRequest GetPlayerActionFromKeyboard() {
+    char move_keys[5] = {'a', 'd', 'w', 's', ' '};
+    int dir = -1;
+    for (int i = 0; i < 4; ++i) {
+      if (keys_[move_keys[i]]) {
+        dir = i;
+        break;
+      }
+    }
+    
+    bman::MovePlayerRequest move;
+    auto* action = move.add_actions();
+    if (dir >= 0) {
+      int dirs[4][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+      int speed = 4;
+      action->set_dir(static_cast<bman::Direction>(dir));
+      action->set_dx(speed * dirs[dir][0]);
+      action->set_dy(speed * dirs[dir][1]);
+    }
+    if (keys_[move_keys[4]]) {
+      action->set_place_bomb(true);
+      keys_[move_keys[4]] = 0;
+    }
+    return move;
+  }
+  
+  // Read and process any pending SDL events
   int HandleInput() {
     SDL_Event event;
     while (SDL_PollEvent(&event))
@@ -270,13 +281,13 @@ public:
 
       case SDL_KEYDOWN: {
         SDL_Keysym keysym = event.key.keysym;
-        keys[keysym.sym] = true;
+        keys_[keysym.sym] = true;
         return 0;
       }
 
       case SDL_KEYUP: {
         SDL_Keysym keysym = event.key.keysym;
-        keys[keysym.sym] = false;
+        keys_[keysym.sym] = false;
         return 0;
       }
       default:
@@ -291,9 +302,13 @@ private:
   GameRenderer game_renderer_;
   Game game_;
   std::unique_ptr<bman::Client> client_;
+  std::unordered_map<int, int> keys_;
+
 };
 
 int main(int ac, char* av[]) {
+  gflags::ParseCommandLineFlags(&ac, &av, true);
+
   GameWindow window;
   window.Loop();
   return 0;
