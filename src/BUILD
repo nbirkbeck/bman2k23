@@ -32,7 +32,11 @@ cc_library(
 
 cc_library(
    name = "game",
-   srcs = ["game.h"],
+   srcs = [
+      "constants.h",
+      "math.h",
+      "game.h"
+   ],
    deps = [":level_proto_cc", ":point"],
 )
 

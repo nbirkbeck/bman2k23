@@ -8,16 +8,9 @@
 #include <memory>
 #include <unordered_map>
 
+#include "constants.h"
+#include "math.h"
 #include "point.h"
-
-const int kDefaultWidth = 17;
-const int kDefaultHeight = 13;
-
-const int kSubpixelSize = 64;
-const int kSubPixelSize = 64;
-const int kDefaultBombTimer = 5 * 60;
-const int kExplosionTimer = 30;
-const int kMovePadding = kSubpixelSize / 16;
 
 struct PointHash {
   size_t operator()(const std::pair<int32_t, int32_t>& point) const {
@@ -31,18 +24,6 @@ struct PointHash {
 typedef std::unordered_map<Point2i, bman::LevelState::Bomb*, PointHash> BombMap;
 typedef std::unordered_map<Point2i, bman::LevelState::Brick*, PointHash>
     BrickMap;
-
-int sign(int x) { return x < 0 ? -1 : (x > 0 ? 1 : 0); }
-
-int GridRound(int x) {
-  if (x >= 0)
-    return x / kSubpixelSize;
-  return (x - kSubpixelSize) / kSubpixelSize;
-}
-
-int SignedMin(int val, int mag) {
-  return sign(val) * std::min(abs(val), abs(mag));
-}
 
 class Game {
 public:
@@ -97,10 +78,6 @@ public:
     player->set_strength(config_.player_config().strength());
   }
 
-  const bman::GameConfig& config() const { return config_; }
-  const bman::GameState& game_state() const { return game_state_; }
-  bman::GameState& game_state() { return game_state_; }
-
   bool Step(const std::vector<bman::MovePlayerRequest>& move_requests) {
     if ((int)move_requests.size() != (int)game_state_.players_size()) {
       LOG(ERROR) << "Move request has invalid number of players";
@@ -146,6 +123,22 @@ public:
     return true;
   }
 
+  const bman::GameConfig& config() const { return config_; }
+  const bman::GameState& game_state() const { return game_state_; }
+  bman::GameState& game_state() { return game_state_; }
+
+  bool IsStaticBrick(int x, int y) const {
+    return IsStaticBrick(config_, x, y);
+  }
+
+  static bool IsStaticBrick(const bman::GameConfig& config, int x, int y) {
+    if (x < 0 || y < 0 || x >= config.level_width() ||
+        y >= config.level_height())
+      return true;
+    return (x % 2 == 1 && y % 2 == 1);
+  }
+
+private:
   std::vector<bman::LevelState::Bomb>
   MovePlayers(const std::vector<bman::MovePlayerRequest>& move_requests,
               const BrickMap& brick_map, const BombMap& bomb_map) {
@@ -366,17 +359,6 @@ public:
         }
       }
     }
-  }
-
-  bool IsStaticBrick(int x, int y) const {
-    return IsStaticBrick(config_, x, y);
-  }
-
-  static bool IsStaticBrick(const bman::GameConfig& config, int x, int y) {
-    if (x < 0 || y < 0 || x >= config.level_width() ||
-        y >= config.level_height())
-      return true;
-    return (x % 2 == 1 && y % 2 == 1);
   }
 
 protected:
