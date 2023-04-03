@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package bman;
 
+// The direction the player is facing
 enum Direction {
   DIR_LEFT = 0;
   DIR_RIGHT = 1;
@@ -9,6 +10,7 @@ enum Direction {
   DIR_DOWN = 3;
 }
 
+// Type of pwoerup
 enum Powerup {
   PUP_NONE = 0;
   PUP_FLAME = 1;
@@ -20,7 +22,9 @@ enum Powerup {
   PUP_DETONATOR = 7;
 }
 
+// State that fully encompases a player
 message PlayerState {
+  // The position (x, y) is of higher fidelity than used for rendering,
   optional int32 x = 1;
   optional int32 y = 2;
   optional Direction dir = 3;
@@ -32,7 +36,11 @@ message PlayerState {
   optional int32 health = 8;
 }
 
+// The state of the level
 message LevelState {
+  // Each brick has a position (grid point) and may be hiding
+  // a powerup. It is solid until it is destroyed, after which
+  // the powerup is revealed.
   message Brick {
     optional int32 x = 1;
     optional int32 y = 2;
@@ -41,6 +49,8 @@ message LevelState {
   }
   repeated Brick bricks = 1;
 
+  // Each bomb has a position (grid point) and strength (flame length)
+  // and is associated with a player.
   message Bomb {
     optional int32 x = 1;
     optional int32 y = 2;
@@ -50,6 +60,8 @@ message LevelState {
   }
   repeated Bomb bombs = 2;
 
+  // Explosion (or flame) is used to denote which part of the game is
+  // lit up with fire (e.g., a position)
   message Explosion {
     message Point {
       optional int32 x = 1;
@@ -62,6 +74,7 @@ message LevelState {
   repeated Explosion explosions = 3;
 }
 
+// The GameState message fully encompasses all state of an ongoing game.
 message GameState {
   repeated int32 score = 1;
 
@@ -72,6 +85,7 @@ message GameState {
   optional LevelState level = 4;
 }
 
+// Static configuration of the level and game (used to init players).
 message GameConfig {
   message PlayerConfig {
     optional int32 num_bombs = 1;
@@ -85,6 +99,20 @@ message GameConfig {
   optional PlayerConfig player_config = 4;
 }
 
+// A client connects to the game with a JoinRequest
+message JoinRequest {
+  optional string game_id = 1;
+  optional string user_name = 2;
+}
+
+message JoinResponse {
+  optional string status_message = 1;
+  optional GameConfig game_config = 2;
+  optional int32 player_index = 3;
+}
+
+// Each client is expected to send a MovePlayerRequest at the
+// framerate of the game.
 message MovePlayerRequest {
   optional string game_id = 1;
   optional int32 player_index = 2;
@@ -105,19 +133,7 @@ message MovePlayerResponse {
   optional GameState game_state = 1;
 }
 
-message JoinRequest {
-  optional string game_id = 1;
-  optional string user_name = 2;
-}
-
-message JoinResponse {
-  optional string status_message = 1;
-  optional GameConfig game_config = 2;
-  optional int32 player_index = 3;
-}
-
-
-// The greeting service definition.
+// A backend service that hosts games.
 service BManService {
   rpc Join (JoinRequest) returns (JoinResponse) {}
   rpc MovePlayer(MovePlayerRequest) returns (MovePlayerResponse) {}
