@@ -1,13 +1,13 @@
 #include <SDL2/SDL.h>
 
-#include "game.h"
 #include "bman_client.h"
+#include "game.h"
 #include "level.grpc.pb.h"
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <iostream>
 #include <memory>
 #include <unordered_map>
-#include <gflags/gflags.h>
-#include <glog/logging.h>
 
 static constexpr int kScreenWidth = 640;
 static constexpr int kScreenHeight = 480;
@@ -18,7 +18,6 @@ static constexpr int kOffsetY = 32;
 DEFINE_string(username, "[name]", "User name to use when connecting to server");
 DEFINE_string(server, "", "Server to connect to (with :port)");
 
- 
 // A class to help manage the Player texture.
 class PlayerTexture {
 public:
@@ -73,10 +72,10 @@ public:
       const int down = exp_map[Point2i(p.x(), p.y() + 1)];
       const int index = left | (right << 1) | (up << 2) | (down << 3);
       static const int mapping[16] = {
-        2, 3, 0, 1, /* none, left, right, left+right */
-        4, 2, 2, 2, /* up, up+left, up+right, up+left+right */
-        5, 2, 2, 2, /* down, down+left, down+right, down+left+right*/
-        6, 2, 2, 2, /* up+down, up+down+left, ... */
+          2, 3, 0, 1, /* none, left, right, left+right */
+          4, 2, 2, 2, /* up, up+left, up+right, up+left+right */
+          5, 2, 2, 2, /* down, down+left, down+right, down+left+right*/
+          6, 2, 2, 2, /* up+down, up+down+left, ... */
       };
       const int x_offset = p.bomb_center() ? 2 : mapping[index];
 
@@ -129,8 +128,8 @@ public:
     SDL_BlitScaled(background_, nullptr, dest, nullptr);
     for (int y = 0; y < config_.level_height(); ++y) {
       for (int x = 0; x < config_.level_width(); ++x) {
-        SDL_Rect src_rect = {kOffsetX + 64 * Game::IsStaticBrick(config_, x, y), kOffsetY,
-                             kGridSize, kGridSize};
+        SDL_Rect src_rect = {kOffsetX + 64 * Game::IsStaticBrick(config_, x, y),
+                             kOffsetY, kGridSize, kGridSize};
         SDL_Rect dest_rect = {kOffsetX + x * kGridSize,
                               kOffsetY + y * kGridSize, kGridSize, kGridSize};
         SDL_BlitScaled(background_, &src_rect, dest, &dest_rect);
@@ -155,17 +154,15 @@ public:
   }
 
   void DrawBomb(const bman::LevelState::Bomb& bomb, SDL_Surface* dest) {
-    SDL_Rect src_rect = {kGridSize * ((bomb.timer() / 16) % 4), 0,
-                         kGridSize, kGridSize};
+    SDL_Rect src_rect = {kGridSize * ((bomb.timer() / 16) % 4), 0, kGridSize,
+                         kGridSize};
     SDL_Rect dest_rect = {kOffsetX + bomb.x() * kGridSize,
                           kOffsetY + bomb.y() * kGridSize, kGridSize,
                           kGridSize};
     SDL_BlitScaled(bomb_, &src_rect, dest, &dest_rect);
   }
 
-  void set_config(const bman::GameConfig& config) {
-    config_ = config;
-  }
+  void set_config(const bman::GameConfig& config) { config_ = config; }
 
 private:
   bman::GameConfig config_;
@@ -204,7 +201,7 @@ public:
     if (!game_renderer_.Load()) {
       LOG(FATAL) << "Failed to load the renderer";
     }
-    
+
     if (!FLAGS_server.empty()) {
       client_ = bman::Client::Create(FLAGS_server);
       auto response = client_->Join(FLAGS_username);
@@ -222,8 +219,7 @@ public:
 
       // Process input to get user action.
       std::vector<bman::MovePlayerRequest> moves = {
-        GetPlayerActionFromKeyboard()
-      };
+          GetPlayerActionFromKeyboard()};
 
       // Send the move to server (or advance local game) and get
       // game state so we can render it.
@@ -234,7 +230,7 @@ public:
         game_.Step(moves);
         state = game_.game_state();
       }
-      
+
       game_renderer_.Draw(state, SDL_GetWindowSurface(window_));
       SDL_UpdateWindowSurface(window_);
 
@@ -253,7 +249,7 @@ public:
         break;
       }
     }
-    
+
     bman::MovePlayerRequest move;
     auto* action = move.add_actions();
     if (dir >= 0) {
@@ -269,7 +265,7 @@ public:
     }
     return move;
   }
-  
+
   // Read and process any pending SDL events
   int HandleInput() {
     SDL_Event event;
@@ -303,7 +299,6 @@ private:
   Game game_;
   std::unique_ptr<bman::Client> client_;
   std::unordered_map<int, int> keys_;
-
 };
 
 int main(int ac, char* av[]) {

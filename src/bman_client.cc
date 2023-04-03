@@ -1,8 +1,8 @@
 #include "bman_client.h"
 
-#include <grpcpp/grpcpp.h>
-#include <glog/logging.h>
 #include "level.grpc.pb.h"
+#include <glog/logging.h>
+#include <grpcpp/grpcpp.h>
 #include <memory>
 
 namespace bman {
@@ -10,11 +10,11 @@ namespace bman {
 JoinResponse Client::Join(const std::string& user) {
   JoinRequest request;
   request.set_user_name(user);
-  
+
   JoinResponse response;
   ClientContext context;
   Status status = stub_->Join(&context, request, &response);
-  
+
   if (!status.ok()) {
     LOG(WARNING) << status.error_code() << ": " << status.error_message()
                  << std::endl;
@@ -30,7 +30,7 @@ MovePlayerResponse Client::MovePlayer(MovePlayerRequest& request) {
   request.set_game_id(game_id_);
   request.set_player_index(player_index_);
   Status status = stub_->MovePlayer(&context, request, &response);
-  
+
   if (!status.ok()) {
     LOG(WARNING) << status.error_code() << ": " << status.error_message()
                  << std::endl;
@@ -39,9 +39,9 @@ MovePlayerResponse Client::MovePlayer(MovePlayerRequest& request) {
 }
 
 std::unique_ptr<Client> Client::Create(const std::string& server) {
-  std::unique_ptr<Client> client(new Client(grpc::CreateChannel(server,
-                                                                grpc::InsecureChannelCredentials())));
+  std::unique_ptr<Client> client(new Client(
+      grpc::CreateChannel(server, grpc::InsecureChannelCredentials())));
   return client;
 }
 
-}  // namespace
+} // namespace bman

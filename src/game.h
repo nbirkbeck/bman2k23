@@ -28,12 +28,9 @@ struct PointHash {
   }
 };
 
-typedef std::unordered_map<Point2i,
-                           bman::LevelState::Bomb*,
-                           PointHash> BombMap;
-typedef std::unordered_map<Point2i,
-                           bman::LevelState::Brick*,
-                           PointHash> BrickMap;
+typedef std::unordered_map<Point2i, bman::LevelState::Bomb*, PointHash> BombMap;
+typedef std::unordered_map<Point2i, bman::LevelState::Brick*, PointHash>
+    BrickMap;
 
 int sign(int x) { return x < 0 ? -1 : (x > 0 ? 1 : 0); }
 
@@ -168,28 +165,29 @@ public:
               x + delta.x + sign(delta.x) * (kSubPixelSize / 2 - kMovePadding);
           other.x = GridRound(test_x);
           other.y = GridRound(y);
-          min_delta.x = (delta.x > 0)
-                       ? std::max(0, cur.x * kSubPixelSize + kSubPixelSize / 2 +
-                                         kMovePadding - x)
-                       : std::min(0, cur.x * kSubPixelSize + kSubPixelSize / 2 -
-                                         kMovePadding - x);
+          min_delta.x =
+              (delta.x > 0)
+                  ? std::max(0, cur.x * kSubPixelSize + kSubPixelSize / 2 +
+                                    kMovePadding - x)
+                  : std::min(0, cur.x * kSubPixelSize + kSubPixelSize / 2 -
+                                    kMovePadding - x);
         } else if (abs(delta.y)) {
           const int test_y =
               y + delta.y + sign(delta.y) * (kSubPixelSize / 2 - kMovePadding);
-          other.y =  GridRound(test_y);
+          other.y = GridRound(test_y);
           other.x = GridRound(x);
-          min_delta.y = (delta.y > 0)
-                       ? std::max(0, cur.y * kSubPixelSize + kSubPixelSize / 2 +
-                                         kMovePadding - y)
-                       : std::min(0, cur.y * kSubPixelSize + kSubPixelSize / 2 -
-                                         kMovePadding - y);
+          min_delta.y =
+              (delta.y > 0)
+                  ? std::max(0, cur.y * kSubPixelSize + kSubPixelSize / 2 +
+                                    kMovePadding - y)
+                  : std::min(0, cur.y * kSubPixelSize + kSubPixelSize / 2 -
+                                    kMovePadding - y);
         }
         const bool can_move =
-          (!IsStaticBrick(other.x, other.y) &&
-           (!brick_map.count(other) ||
-            !brick_map.at(other)->solid()) &&
-           !bomb_map.count(other)) ||
-          (other == cur);
+            (!IsStaticBrick(other.x, other.y) &&
+             (!brick_map.count(other) || !brick_map.at(other)->solid()) &&
+             !bomb_map.count(other)) ||
+            (other == cur);
 
         player->set_x(x + (can_move ? delta.x : min_delta.x));
         player->set_y(y + (can_move ? delta.y : min_delta.y));
@@ -257,8 +255,7 @@ public:
     }
   }
   void PlayerTryPlaceBomb(std::vector<bman::LevelState::Bomb>& new_bombs,
-                          bman::PlayerState* player,
-                          int player_index,
+                          bman::PlayerState* player, int player_index,
                           const Point2i& cur) {
     if (player->num_used_bombs() < player->num_bombs()) {
       new_bombs.resize(new_bombs.size() + 1);
@@ -346,8 +343,8 @@ public:
           const int min_y = GridRound(player.y() - kSubpixelSize / 2);
           const int max_x = GridRound(player.x() + kSubpixelSize / 2 - 1);
           const int max_y = GridRound(player.y() + kSubpixelSize / 2 - 1);
-          if (min_x <= point.x && point.x <= max_x &&
-              min_y <= point.y && point.y <= max_y) {
+          if (min_x <= point.x && point.x <= max_x && min_y <= point.y &&
+              point.y <= max_y) {
             player.set_health(player.health() - 1);
             if (player.health() < 0) {
               // TODO: kill player and respawn
@@ -381,7 +378,6 @@ public:
       return true;
     return (x % 2 == 1 && y % 2 == 1);
   }
-
 
 protected:
   int32_t clock_ = 0;

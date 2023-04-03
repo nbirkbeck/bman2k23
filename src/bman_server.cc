@@ -8,11 +8,11 @@
 
 #include "level.grpc.pb.h"
 
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <grpcpp/ext/proto_server_reflection_plugin.h>
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/health_check_service_interface.h>
-#include <gflags/gflags.h>
-#include <glog/logging.h>
 
 #include "game.h"
 #include <memory>
@@ -33,7 +33,7 @@ using bman::JoinResponse;
 using bman::MovePlayerRequest;
 using bman::MovePlayerResponse;
 
-class GameRunner  {
+class GameRunner {
 public:
   ~GameRunner() {
     stopped_ = true;
@@ -48,8 +48,9 @@ public:
   void Loop() {
     while (!stopped_) {
       if (game_.game_state().players_size() > 0) {
-        std::vector<bman::MovePlayerRequest> move_requests(game_.game_state().players_size());
-      
+        std::vector<bman::MovePlayerRequest> move_requests(
+            game_.game_state().players_size());
+
         pthread_mutex_lock(&request_mutex_);
         for (int i = 0; i < (int)pending_requests_.size(); ++i) {
           move_requests[i] = pending_requests_[i];
@@ -60,11 +61,11 @@ public:
         pthread_mutex_lock(&game_mutex_);
         game_.Step(move_requests);
         pthread_mutex_unlock(&game_mutex_);
-      }      
+      }
       usleep(1000 / 60.0 * 1000);
     }
   }
-  static void* StaticLoop(void*arg) {
+  static void* StaticLoop(void* arg) {
     GameRunner* runner = (GameRunner*)arg;
     runner->Loop();
     return nullptr;
@@ -89,8 +90,9 @@ public:
     if ((int)request.player_index() >= (int)pending_requests_.size()) {
       pending_requests_.resize(request.player_index() + 1);
     }
-    pending_requests_[request.player_index()].set_player_index(request.player_index());
-    for (const auto& a: request.actions()) {
+    pending_requests_[request.player_index()].set_player_index(
+        request.player_index());
+    for (const auto& a : request.actions()) {
       *pending_requests_[request.player_index()].add_actions() = a;
     }
     pthread_mutex_unlock(&request_mutex_);
@@ -114,21 +116,21 @@ public:
       games[request->game_id()].reset(new GameRunner);
       games[request->game_id()]->Start();
     }
-    LOG(INFO) << "Player " << request->user_name() << " has connected as player="
-              << num_clients_;
+    LOG(INFO) << "Player " << request->user_name()
+              << " has connected as player=" << num_clients_;
     reply->set_status_message(
         absl::StrFormat("Hello %s %d", request->user_name(), num_clients_));
     reply->set_player_index(num_clients_);
     *reply->mutable_game_config() = games[request->game_id()]->AddPlayer();
-    
+
     ++num_clients_;
     return Status::OK;
   }
 
-  Status MovePlayer(ServerContext* context,
-                    const MovePlayerRequest* request,
+  Status MovePlayer(ServerContext* context, const MovePlayerRequest* request,
                     MovePlayerResponse* response) {
-    if (!games[request->game_id()]) return Status::OK;
+    if (!games[request->game_id()])
+      return Status::OK;
 
     // Push the move request and return whatever the current game state is
     games[request->game_id()]->PushRequest(*request);
@@ -136,9 +138,9 @@ public:
 
     return Status::OK;
   }
-  
+
   int num_clients_;
-  std::map<std::string, std::unique_ptr<GameRunner> > games;
+  std::map<std::string, std::unique_ptr<GameRunner>> games;
 };
 
 void RunServer(uint16_t port) {
