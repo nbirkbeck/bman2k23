@@ -51,11 +51,11 @@ cc_binary(
     name = "bman_server",
     srcs = ["bman_server.cc"],
     defines = ["BAZEL_BUILD"],
-    linkopts = ['-lglog'],
     deps = [
         ":level_proto_cc",
         ":game",
-        "@gflags//:lib",
+        "@com_github_glog_glog//:glog",
+        "@com_github_gflags_gflags//:gflags",
     ],
 )
 
@@ -66,6 +66,7 @@ cc_library(
     defines = ["BAZEL_BUILD"],
     deps = [
         ":level_proto_cc",
+        "@com_github_glog_glog//:glog",
     ],
 )
 
@@ -74,9 +75,10 @@ cc_binary(
     name = "bman",
     srcs = ["bman.cc"],
     defines = ["BAZEL_BUILD"],
-    linkopts = ['-lSDL2  -lglog'],
+    linkopts = ['-lSDL2'],
     deps = [
-        "@gflags//:lib",
+        "@com_github_gflags_gflags//:gflags",
+        "@com_github_glog_glog//:glog",
         ":level_proto_cc",
         ":game",
         ":bman_client",
