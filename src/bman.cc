@@ -18,6 +18,7 @@ static constexpr int kOffsetY = 32;
 DEFINE_string(username, "[name]", "User name to use when connecting to server");
 DEFINE_string(server, "", "Server to connect to (with :port)");
 DEFINE_bool(stream, false, "Use streaming RPC");
+DEFINE_int32(client_delay, 0, "Introduce latency in the client request");
 
 // A class to help manage the Player texture.
 class PlayerTexture {
@@ -204,7 +205,7 @@ public:
     }
 
     if (!FLAGS_server.empty()) {
-      client_ = bman::Client::Create(FLAGS_server);
+      client_ = bman::Client::Create(FLAGS_server, FLAGS_client_delay);
       auto response = client_->Join(FLAGS_username);
       game_renderer_.set_config(response.game_config());
     } else {

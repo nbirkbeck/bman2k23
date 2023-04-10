@@ -1,8 +1,8 @@
+#include <deque>
+#include <grpcpp/grpcpp.h>
 #include <iostream>
 #include <memory>
 #include <string>
-
-#include <grpcpp/grpcpp.h>
 
 #include "level.grpc.pb.h"
 #include <memory>
@@ -21,14 +21,14 @@ using grpc::Status;
 // A client connection to the server (manages game_id and player_index)
 class Client {
 public:
-  Client(std::shared_ptr<Channel> channel)
-      : stub_(BManService::NewStub(channel)) {}
+  Client(std::shared_ptr<Channel> channel, int delay = 0)
+      : stub_(BManService::NewStub(channel)), delay_(delay) {}
 
   JoinResponse Join(const std::string& user);
   MovePlayerResponse MovePlayer(MovePlayerRequest& request);
   MovePlayerResponse StreamingMovePlayer(MovePlayerRequest& request);
 
-  static std::unique_ptr<Client> Create(const std::string& server);
+  static std::unique_ptr<Client> Create(const std::string& server, int delay);
 
 private:
   std::unique_ptr<bman::BManService::Stub> stub_;
@@ -36,7 +36,10 @@ private:
       streaming_;
   std::unique_ptr<ClientContext> context_; // Used for streaming
   std::string game_id_;
+  std::deque<MovePlayerRequest> request_queue_;
+
   int player_index_ = 0;
+  int delay_ = 0;
 };
 
 } // namespace bman

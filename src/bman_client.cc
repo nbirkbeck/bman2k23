@@ -26,14 +26,20 @@ JoinResponse Client::Join(const std::string& user) {
 
 MovePlayerResponse Client::MovePlayer(MovePlayerRequest& request) {
   MovePlayerResponse response;
-  ClientContext context;
-  request.set_game_id(game_id_);
-  request.set_player_index(player_index_);
-  Status status = stub_->MovePlayer(&context, request, &response);
+  request_queue_.push_back(request);
+  if ((int)request_queue_.size() > delay_) {
+    request = request_queue_.front();
 
-  if (!status.ok()) {
-    LOG(WARNING) << status.error_code() << ": " << status.error_message()
-                 << std::endl;
+    ClientContext context;
+    request.set_game_id(game_id_);
+    request.set_player_index(player_index_);
+    Status status = stub_->MovePlayer(&context, request, &response);
+
+    if (!status.ok()) {
+      LOG(WARNING) << status.error_code() << ": " << status.error_message()
+                   << std::endl;
+    }
+    request_queue_.pop_front();
   }
   return response;
 }
@@ -57,9 +63,9 @@ MovePlayerResponse Client::StreamingMovePlayer(MovePlayerRequest& request) {
   return response;
 }
 
-std::unique_ptr<Client> Client::Create(const std::string& server) {
+std::unique_ptr<Client> Client::Create(const std::string& server, int delay) {
   std::unique_ptr<Client> client(new Client(
-      grpc::CreateChannel(server, grpc::InsecureChannelCredentials())));
+      grpc::CreateChannel(server, grpc::InsecureChannelCredentials()), delay));
   return client;
 }
 
