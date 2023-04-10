@@ -139,6 +139,25 @@ public:
     return Status::OK;
   }
 
+  Status
+  StreamingMovePlayer(ServerContext* context,
+                      ServerReaderWriter<MovePlayerResponse, MovePlayerRequest>*
+                          stream) override {
+    MovePlayerRequest request;
+    while (stream->Read(&request)) {
+      if (!games[request.game_id()])
+        return Status::OK;
+
+      // Push the move request
+      games[request.game_id()]->PushRequest(request);
+      // and return whatever the current game state is
+      MovePlayerResponse response;
+      games[request.game_id()]->GetState(response.mutable_game_state());
+      stream->Write(response);
+    }
+    return Status::OK;
+  }
+
   int num_clients_;
   std::map<std::string, std::unique_ptr<GameRunner>> games;
 };

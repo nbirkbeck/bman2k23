@@ -38,6 +38,25 @@ MovePlayerResponse Client::MovePlayer(MovePlayerRequest& request) {
   return response;
 }
 
+MovePlayerResponse Client::StreamingMovePlayer(MovePlayerRequest& request) {
+  if (!streaming_) {
+    context_.reset(new ClientContext);
+    streaming_ = std::move(stub_->StreamingMovePlayer(context_.get()));
+  }
+
+  request.set_game_id(game_id_);
+  request.set_player_index(player_index_);
+  if (!streaming_->Write(request)) {
+    LOG(ERROR) << "Unable to write request";
+    return {};
+  }
+  MovePlayerResponse response;
+  if (streaming_->Read(&response)) {
+    return response;
+  }
+  return response;
+}
+
 std::unique_ptr<Client> Client::Create(const std::string& server) {
   std::unique_ptr<Client> client(new Client(
       grpc::CreateChannel(server, grpc::InsecureChannelCredentials())));

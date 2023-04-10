@@ -137,4 +137,6 @@ message MovePlayerResponse {
 service BManService {
   rpc Join (JoinRequest) returns (JoinResponse) {}
   rpc MovePlayer(MovePlayerRequest) returns (MovePlayerResponse) {}
+
+  rpc StreamingMovePlayer(stream MovePlayerRequest) returns (stream MovePlayerResponse) {}
 }

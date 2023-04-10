@@ -17,6 +17,7 @@ static constexpr int kOffsetY = 32;
 
 DEFINE_string(username, "[name]", "User name to use when connecting to server");
 DEFINE_string(server, "", "Server to connect to (with :port)");
+DEFINE_bool(stream, false, "Use streaming RPC");
 
 // A class to help manage the Player texture.
 class PlayerTexture {
@@ -225,7 +226,9 @@ public:
       // game state so we can render it.
       bman::GameState state;
       if (client_) {
-        state = client_->MovePlayer(moves[0]).game_state();
+        state = FLAGS_stream
+                    ? client_->StreamingMovePlayer(moves[0]).game_state()
+                    : client_->MovePlayer(moves[0]).game_state();
       } else {
         game_.Step(moves);
         state = game_.game_state();
