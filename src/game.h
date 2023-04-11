@@ -207,7 +207,8 @@ private:
 
         // If player wants to place a bomb, do it
         if (action.place_bomb()) {
-          if (!bomb_map.count(cur) && !brick_map.count(cur)) {
+          if (!bomb_map.count(cur) &&
+              (!brick_map.count(cur) || !brick_map.at(cur)->solid()))  {
             PlayerTryPlaceBomb(new_bombs, player, player_index, cur);
           }
         }
