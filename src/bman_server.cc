@@ -35,11 +35,11 @@ using bman::MovePlayerResponse;
 
 class GameRunner {
 public:
-  ~GameRunner() {
-    stopped_ = true;
+  GameRunner() {
     pthread_mutex_init(&game_mutex_, nullptr);
     pthread_mutex_init(&request_mutex_, nullptr);
   }
+  ~GameRunner() { stopped_ = true; }
 
   void Start() {
     game_.BuildSimpleLevel(2);
@@ -48,18 +48,22 @@ public:
   void Loop() {
     while (!stopped_) {
       if (game_.game_state().players_size() > 0) {
+        std::vector<int> request_times(game_.game_state().players_size());
         std::vector<bman::MovePlayerRequest> move_requests(
             game_.game_state().players_size());
 
         pthread_mutex_lock(&request_mutex_);
         for (int i = 0; i < (int)pending_requests_.size(); ++i) {
           move_requests[i] = pending_requests_[i];
+          request_times[i] =
+              std::max(client_times_[i], pending_requests_[i].client_clock());
           pending_requests_[i].Clear();
         }
         pthread_mutex_unlock(&request_mutex_);
 
         pthread_mutex_lock(&game_mutex_);
         game_.Step(move_requests);
+        client_times_ = request_times;
         pthread_mutex_unlock(&game_mutex_);
       }
       usleep(1000 / 60.0 * 1000);
@@ -75,14 +79,19 @@ public:
     pthread_mutex_lock(&game_mutex_);
     auto config = game_.config();
     game_.AddPlayer();
+    client_times_.push_back(0);
     pthread_mutex_unlock(&game_mutex_);
     return config;
   }
 
-  void GetState(bman::GameState* game_state) {
+  int GetState(int player_index, bman::GameState* game_state) {
+    int client_time = 0;
     pthread_mutex_lock(&game_mutex_);
     *game_state = game_.game_state();
+    if (player_index >= 0 && player_index < (int32_t)client_times_.size())
+      client_time = client_times_[player_index];
     pthread_mutex_unlock(&game_mutex_);
+    return client_time;
   }
 
   void PushRequest(const bman::MovePlayerRequest& request) {
@@ -90,8 +99,13 @@ public:
     if ((int)request.player_index() >= (int)pending_requests_.size()) {
       pending_requests_.resize(request.player_index() + 1);
     }
+
     pending_requests_[request.player_index()].set_player_index(
         request.player_index());
+    pending_requests_[request.player_index()].set_client_clock(
+        std::max(pending_requests_[request.player_index()].client_clock(),
+                 request.client_clock()));
+
     for (const auto& a : request.actions()) {
       *pending_requests_[request.player_index()].add_actions() = a;
     }
@@ -103,6 +117,7 @@ public:
   pthread_mutex_t game_mutex_;
   pthread_mutex_t request_mutex_;
   Game game_;
+  std::vector<int> client_times_;
   std::vector<bman::MovePlayerRequest> pending_requests_;
 };
 
@@ -134,8 +149,9 @@ public:
 
     // Push the move request and return whatever the current game state is
     games[request->game_id()]->PushRequest(*request);
-    games[request->game_id()]->GetState(response->mutable_game_state());
-
+    int client_clock = games[request->game_id()]->GetState(
+        request->player_index(), response->mutable_game_state());
+    response->set_client_clock(client_clock);
     return Status::OK;
   }
 
@@ -152,7 +168,11 @@ public:
       games[request.game_id()]->PushRequest(request);
       // and return whatever the current game state is
       MovePlayerResponse response;
-      games[request.game_id()]->GetState(response.mutable_game_state());
+      games[request.game_id()]->GetState(request.player_index(),
+                                         response.mutable_game_state());
+      int client_clock = games[request.game_id()]->GetState(
+          request.player_index(), response.mutable_game_state());
+      response.set_client_clock(client_clock);
       stream->Write(response);
     }
     return Status::OK;

@@ -26,13 +26,13 @@ JoinResponse Client::Join(const std::string& user) {
 
 MovePlayerResponse Client::MovePlayer(MovePlayerRequest& request) {
   MovePlayerResponse response;
+  AdjustRequest(request);
   request_queue_.push_back(request);
+
   if ((int)request_queue_.size() > delay_) {
     request = request_queue_.front();
 
     ClientContext context;
-    request.set_game_id(game_id_);
-    request.set_player_index(player_index_);
     Status status = stub_->MovePlayer(&context, request, &response);
 
     if (!status.ok()) {
@@ -41,6 +41,7 @@ MovePlayerResponse Client::MovePlayer(MovePlayerRequest& request) {
     }
     request_queue_.pop_front();
   }
+  UpdateTiming(response);
   return response;
 }
 
@@ -50,17 +51,32 @@ MovePlayerResponse Client::StreamingMovePlayer(MovePlayerRequest& request) {
     streaming_ = std::move(stub_->StreamingMovePlayer(context_.get()));
   }
 
-  request.set_game_id(game_id_);
-  request.set_player_index(player_index_);
+  AdjustRequest(request);
   if (!streaming_->Write(request)) {
     LOG(ERROR) << "Unable to write request";
     return {};
   }
   MovePlayerResponse response;
-  if (streaming_->Read(&response)) {
-    return response;
-  }
+  streaming_->Read(&response);
+  UpdateTiming(response);
   return response;
+}
+
+void Client::AdjustRequest(MovePlayerRequest& request) {
+  request.set_game_id(game_id_);
+  request.set_player_index(player_index_);
+  request.set_client_clock(latest_time_);
+}
+
+void Client::UpdateTiming(const MovePlayerResponse& response) {
+  if (response.game_state().has_clock() && response.game_state().clock() >= 0) {
+    if (first_move_clock_ < 0) {
+      first_move_clock_ = response.game_state().clock();
+    }
+    latest_time_ = response.game_state().clock();
+    const int latency = response.game_state().clock() - response.client_clock();
+    LOG_EVERY_N(INFO, 60) << "Latency:" << latency << " " << latest_time_;
+  }
 }
 
 std::unique_ptr<Client> Client::Create(const std::string& server, int delay) {

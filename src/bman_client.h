@@ -31,6 +31,9 @@ public:
   static std::unique_ptr<Client> Create(const std::string& server, int delay);
 
 private:
+  void AdjustRequest(MovePlayerRequest& request);
+  void UpdateTiming(const MovePlayerResponse& response);
+
   std::unique_ptr<bman::BManService::Stub> stub_;
   std::unique_ptr<ClientReaderWriter<MovePlayerRequest, MovePlayerResponse>>
       streaming_;
@@ -40,6 +43,8 @@ private:
 
   int player_index_ = 0;
   int delay_ = 0;
+  int first_move_clock_ = -1;
+  int latest_time_ = 0;
 };
 
 } // namespace bman

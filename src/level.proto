@@ -117,7 +117,8 @@ message MovePlayerRequest {
   optional string game_id = 1;
   optional int32 player_index = 2;
   optional PlayerState previous_state = 3;
-
+  optional int32 client_clock = 5; // client-side timing
+  
   message Action {
     optional int32 clock = 1;
     optional int32 dx = 2;
@@ -131,6 +132,7 @@ message MovePlayerRequest {
 
 message MovePlayerResponse {
   optional GameState game_state = 1;
+  optional int32 client_clock = 2;
 }
 
 // A backend service that hosts games.
