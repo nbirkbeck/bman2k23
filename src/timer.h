@@ -10,7 +10,6 @@
 #include <emscripten.h>
 #endif
 
-
 extern FILE* debug;
 
 namespace bman {
@@ -18,14 +17,13 @@ class Timer {
 public:
   Timer(void) { Start(); }
 
-  void Start() {
-    gettimeofday(&start_time_, nullptr);
-  }
+  void Start() { gettimeofday(&start_time_, nullptr); }
   void Wait(int64_t ms_to_wait) {
     struct timeval tv, elapsed_time;
     gettimeofday(&tv, nullptr);
     timersub(&tv, &start_time_, &elapsed_time);
-    int64_t millis = ms_to_wait - (elapsed_time.tv_sec * 1000 + elapsed_time.tv_usec / 1000);
+    int64_t millis =
+        ms_to_wait - (elapsed_time.tv_sec * 1000 + elapsed_time.tv_usec / 1000);
     if (millis >= 2)
       Timer::SleepMillis(millis);
   }
@@ -42,6 +40,6 @@ public:
 private:
   struct timeval start_time_;
 };
-}  // namespace bman
+} // namespace bman
 
 #endif

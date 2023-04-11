@@ -9,5 +9,6 @@ const int kSubPixelSize = 64;
 const int kDefaultBombTimer = 5 * 60;
 const int kExplosionTimer = 30;
 const int kMovePadding = kSubpixelSize / 16;
+const int kDyingTimer = 4 * 3 * 3;
 
 #endif

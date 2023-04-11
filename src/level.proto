@@ -34,6 +34,12 @@ message PlayerState {
   optional int32 strength = 6;
   optional bool has_detonator = 7;
   optional int32 health = 8;
+  enum State {
+    STATE_ALIVE = 0;
+    STATE_DYING = 1;
+    STATE_SPAWNING = 2;
+  }
+  optional State state = 10;
 }
 
 // The state of the level

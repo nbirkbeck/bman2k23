@@ -32,16 +32,33 @@ public:
   void Draw(const bman::PlayerState& ps, SDL_Surface* dest) {
     const int dir = static_cast<int>(ps.dir());
     int x_offset = (ps.anim_counter() / 8) % 4;
-    if (x_offset == 2 || x_offset == 0)
-      x_offset = 0;
-    else if (x_offset == 3)
-      x_offset--;
-    SDL_Rect src_rect = {32 * x_offset, 64 * dir, kGridSize, 64};
+    int y_offset = 0;
+    int size_increase_x = 0;
+    int size_increase_y = 0;
+
+    if (ps.state() == bman::PlayerState::STATE_DYING) {
+      x_offset = (ps.anim_counter() / 8) % 3;
+      y_offset = (ps.anim_counter() / 8) / 3 + 4;
+      size_increase_x = ps.anim_counter() / 4;
+      size_increase_y = ps.anim_counter() / 4;
+    } else if (ps.state() == bman::PlayerState::STATE_SPAWNING) {
+      size_increase_x = -(16 - 16 * ps.anim_counter() / kDyingTimer);
+      size_increase_y = (128 - 128 * ps.anim_counter() / kDyingTimer);
+    } else {
+      y_offset = dir;
+      if (x_offset == 2 || x_offset == 0)
+        x_offset = 0;
+      else if (x_offset == 3)
+        x_offset--;
+    }
+    SDL_Rect src_rect = {kGridSize * x_offset, 2 * kGridSize * y_offset,
+                         kGridSize, 2 * kGridSize};
     SDL_Rect dest_rect = {kOffsetX + ps.x() * kGridSize / kSubpixelSize -
-                              kGridSize / 2,
+                              kGridSize / 2 - size_increase_x,
                           kOffsetY + ps.y() * kGridSize / kSubpixelSize -
-                              kGridSize / 2 - kGridSize,
-                          kGridSize, 64};
+                              kGridSize / 2 - kGridSize - size_increase_y * 2,
+                          kGridSize + size_increase_x * 2,
+                          (kGridSize * 2 + size_increase_y * 4)};
     SDL_BlitScaled(surface_, &src_rect, dest, &dest_rect);
   }
   SDL_Surface* surface_;

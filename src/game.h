@@ -65,17 +65,29 @@ public:
 
   void AddPlayer() {
     game_state_.add_score(0);
+    int player_index = game_state_.players_size();
     auto* player = game_state_.add_players();
-    if (game_state_.players_size() == 1) {
-      player->set_x(kSubpixelSize / 2);
-      player->set_y(kSubpixelSize / 2);
-    } else if (game_state_.players_size() == 2) {
-      player->set_x(config_.level_width() * kSubpixelSize - kSubpixelSize / 2);
-      player->set_y(config_.level_height() * kSubpixelSize - kSubpixelSize / 2);
-    }
+    const Point2i point = GetSpawnPoint(player_index);
+    player->set_x(point.x);
+    player->set_y(point.y);
     player->set_num_bombs(config_.player_config().num_bombs());
     player->set_health(config_.player_config().health());
     player->set_strength(config_.player_config().strength());
+  }
+
+  Point2i GetSpawnPoint(int player_index) {
+    if (player_index % 4 == 0) {
+      return Point2i(kSubpixelSize / 2, kSubpixelSize / 2);
+    } else if (player_index % 4 == 1) {
+      return Point2i(config_.level_width() * kSubpixelSize - kSubpixelSize / 2,
+                     config_.level_height() * kSubpixelSize -
+                         kSubpixelSize / 2);
+    } else if (player_index % 4 == 2) {
+      return Point2i(kSubpixelSize / 2, config_.level_height() * kSubpixelSize -
+                                            kSubpixelSize / 2);
+    }
+    return Point2i(config_.level_width() * kSubpixelSize - kSubpixelSize / 2,
+                   kSubpixelSize / 2);
   }
 
   bool Step(const std::vector<bman::MovePlayerRequest>& move_requests) {
@@ -153,6 +165,26 @@ private:
         Point2i other(0, 0);
         const Point2i cur(GridRound(x), GridRound(y));
 
+        if (player->state() == bman::PlayerState::STATE_DYING) {
+          player->set_anim_counter(player->anim_counter() + 1);
+          if (player->anim_counter() >= kDyingTimer) {
+            player->set_anim_counter(0);
+            player->set_state(bman::PlayerState::STATE_SPAWNING);
+            Point2i pt = GetSpawnPoint(player_index);
+            player->set_x(pt.x);
+            player->set_y(pt.y);
+          }
+          continue;
+        } else if (player->state() == bman::PlayerState::STATE_SPAWNING) {
+          player->set_anim_counter(player->anim_counter() + 1);
+          if (player->anim_counter() >= kDyingTimer) {
+            player->set_anim_counter(0);
+            player->set_state(bman::PlayerState::STATE_ALIVE);
+            player->set_health(1); // TODO(birkbeck): Set from world
+          }
+          continue;
+        }
+
         if (abs(delta.x)) {
           const int test_x =
               x + delta.x + sign(delta.x) * (kSubPixelSize / 2 - kMovePadding);
@@ -208,7 +240,7 @@ private:
         // If player wants to place a bomb, do it
         if (action.place_bomb()) {
           if (!bomb_map.count(cur) &&
-              (!brick_map.count(cur) || !brick_map.at(cur)->solid()))  {
+              (!brick_map.count(cur) || !brick_map.at(cur)->solid())) {
             PlayerTryPlaceBomb(new_bombs, player, player_index, cur);
           }
         }
@@ -340,8 +372,11 @@ private:
           if (min_x <= point.x && point.x <= max_x && min_y <= point.y &&
               point.y <= max_y) {
             player.set_health(player.health() - 1);
-            if (player.health() < 0) {
-              // TODO: kill player and respawn
+            if (player.health() <= 0) {
+              player.set_state(bman::PlayerState::STATE_DYING);
+              player.set_anim_counter(0);
+              LOG(INFO) << "Player is dead\n";
+              // TODO(birkbeck): adjust score to owning player
             }
           }
         }
