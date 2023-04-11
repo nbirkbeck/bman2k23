@@ -35,7 +35,8 @@ cc_library(
    srcs = [
       "constants.h",
       "math.h",
-      "game.h"
+      "game.h",
+      "timer.h"
    ],
    deps = [":level_proto_cc", ":point"],
 )

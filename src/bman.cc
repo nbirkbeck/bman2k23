@@ -3,6 +3,7 @@
 #include "bman_client.h"
 #include "game.h"
 #include "level.grpc.pb.h"
+#include "timer.h"
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <iostream>
@@ -217,6 +218,7 @@ public:
 
   void Loop() {
     while (true) {
+      bman::Timer timer;
       HandleInput();
 
       // Process input to get user action.
@@ -238,9 +240,7 @@ public:
       game_renderer_.Draw(state, SDL_GetWindowSurface(window_));
       SDL_UpdateWindowSurface(window_);
 
-      // TODO(birkbeck): This targets 60hz, should take into account
-      // time spendt in rendering.
-      usleep(1000 / 60.0 * 1000);
+      timer.Wait(1000 / 60);
     }
   }
 
