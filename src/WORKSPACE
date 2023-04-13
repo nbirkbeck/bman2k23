@@ -1,4 +1,5 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 http_archive(
     name = "rules_proto_grpc",
@@ -38,10 +39,17 @@ http_archive(
 )
 
 
-
-load("@bazel_pkg_config//:pkg_config.bzl", "pkg_config")
-
-pkg_config(
-    name = "gflags",
+git_repository(
+    name = "com_github_gflags_gflags",
+    remote = "https://github.com/gflags/gflags.git",
+    tag = "v2.2.2"
 )
 
+git_repository(
+    name = "com_github_glog_glog",
+    remote = "https://github.com/google/glog.git",
+    tag = "v0.6.0",
+)
+
+
+load("@bazel_pkg_config//:pkg_config.bzl", "pkg_config")

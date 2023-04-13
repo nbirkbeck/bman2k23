@@ -5,7 +5,7 @@
 #include "level.grpc.pb.h"
 #include "timer.h"
 #include <gflags/gflags.h>
-#include <glog/logging.h>
+#include "glog/logging.h"
 #include <iostream>
 #include <memory>
 #include <unordered_map>
