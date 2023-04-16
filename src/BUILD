@@ -76,7 +76,7 @@ cc_binary(
     name = "bman",
     srcs = ["bman.cc"],
     defines = ["BAZEL_BUILD"],
-    linkopts = ['-lSDL2'],
+    linkopts = ['-lSDL2 -lSDL2_ttf' ],
     deps = [
         "@com_github_gflags_gflags//:gflags",
         "@com_github_glog_glog//:glog",

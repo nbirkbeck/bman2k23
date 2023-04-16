@@ -11,4 +11,8 @@ const int kExplosionTimer = 30;
 const int kMovePadding = kSubpixelSize / 16;
 const int kDyingTimer = 4 * 3 * 3;
 
+const int kPointsKill = 50;
+const int kPointsPowerUp = 10;
+const int kPointsBrick = 1;
+
 #endif

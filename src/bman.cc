@@ -1,11 +1,12 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 
 #include "bman_client.h"
 #include "game.h"
+#include "glog/logging.h"
 #include "level.grpc.pb.h"
 #include "timer.h"
 #include <gflags/gflags.h>
-#include "glog/logging.h"
 #include <iostream>
 #include <memory>
 #include <unordered_map>
@@ -115,6 +116,7 @@ public:
     background_ = SDL_LoadBMP("data/background.bmp");
     bomb_ = SDL_LoadBMP("data/bomb.bmp");
     powerup_ = SDL_LoadBMP("data/powerup.bmp");
+    font_ = TTF_OpenFont("data/Vera.ttf", 14);
     SDL_SetColorKey(bomb_, 1, 0);
     return player_texture_.Load() && explosion_texture_.Load();
   }
@@ -141,6 +143,21 @@ public:
 
     for (const auto& player : game_state.players()) {
       player_texture_.Draw(player, dest);
+    }
+    // Draw the scores
+    int y = 8, x = 32;
+    for (const auto& score : game_state.score()) {
+      SDL_Color color = {200, 200, 200, 255};
+      char message[64];
+      snprintf(message, sizeof(message), "score: %d", score);
+
+      SDL_Surface* surface_message =
+          TTF_RenderText_Solid(font_, message, color);
+      SDL_Rect rect = {x, y, 10, 100};
+      SDL_BlitSurface(surface_message, nullptr, dest, &rect);
+
+      SDL_FreeSurface(surface_message);
+      x += 64;
     }
   }
 
@@ -191,6 +208,7 @@ private:
   SDL_Surface* powerup_;
   PlayerTexture player_texture_;
   ExplosionTexture explosion_texture_;
+  TTF_Font* font_;
 };
 
 class GameWindow {
@@ -216,6 +234,9 @@ public:
 
     if (!sdl_renderer_) {
       LOG(FATAL) << "Failed to create renderer:" << SDL_GetError();
+    }
+    if (TTF_Init() == -1) {
+      LOG(FATAL) << "Failed to init TTF";
     }
 
     if (!game_renderer_.Load()) {

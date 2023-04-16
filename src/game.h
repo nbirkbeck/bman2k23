@@ -247,7 +247,7 @@ private:
 
         // If player is over a power-up, give it to them.
         if (brick_map.count(new_pt)) {
-          PlayerGivePowerup(player, brick_map.at(new_pt));
+          PlayerGivePowerup(player, player_index, brick_map.at(new_pt));
         }
       }
       player_index++;
@@ -255,10 +255,12 @@ private:
     return new_bombs;
   }
 
-  void PlayerGivePowerup(bman::PlayerState* player,
+  void PlayerGivePowerup(bman::PlayerState* player, int player_index,
                          bman::LevelState::Brick* brick) {
     if (!brick->solid()) {
       if (brick->has_powerup()) {
+        game_state_.set_score(player_index,
+                              game_state_.score(player_index) + kPointsPowerUp);
         switch (brick->powerup()) {
         case bman::PUP_NONE:
           break;
@@ -364,25 +366,39 @@ private:
         p->set_y(point.y);
 
         // Do damage to players
+        int player_index = 0;
         for (auto& player : *game_state_.mutable_players()) {
-          const int min_x = GridRound(player.x() - kSubpixelSize / 2);
-          const int min_y = GridRound(player.y() - kSubpixelSize / 2);
-          const int max_x = GridRound(player.x() + kSubpixelSize / 2 - 1);
-          const int max_y = GridRound(player.y() + kSubpixelSize / 2 - 1);
+          const int min_x = GridRound(player.x());
+          const int min_y = GridRound(player.y());
+          const int max_x = min_x;
+          const int max_y = min_y;
           if (min_x <= point.x && point.x <= max_x && min_y <= point.y &&
               point.y <= max_y) {
             player.set_health(player.health() - 1);
             if (player.health() <= 0) {
+              LOG(INFO) << "Player " << player_index << " is dead\n";
               player.set_state(bman::PlayerState::STATE_DYING);
               player.set_anim_counter(0);
-              LOG(INFO) << "Player is dead\n";
-              // TODO(birkbeck): adjust score to owning player
+
+              if (bomb->player_id() == player_index) {
+                game_state_.set_score(player_index,
+                                      game_state_.score(player_index) -
+                                          kPointsKill);
+              } else {
+                game_state_.set_score(bomb->player_id(),
+                                      game_state_.score(player_index) +
+                                          kPointsKill);
+              }
             }
           }
+          player_index++;
         }
 
         // Damage world.
         if (brick_map.count(point) && brick_map[point]->solid()) {
+          game_state_.set_score(bomb->player_id(),
+                                game_state_.score(bomb->player_id()) +
+                                    kPointsBrick);
           brick_map[point]->set_solid(false);
           break;
         }
