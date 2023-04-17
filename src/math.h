@@ -13,4 +13,6 @@ inline int SignedMin(int val, int mag) {
   return sign(val) * std::min(abs(val), abs(mag));
 }
 
+inline double random_double() { return double(::rand()) / RAND_MAX; }
+
 #endif

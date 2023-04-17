@@ -15,4 +15,6 @@ const int kPointsKill = 50;
 const int kPointsPowerUp = 10;
 const int kPointsBrick = 1;
 
+const int kAgentSpeed = 4;
+
 #endif

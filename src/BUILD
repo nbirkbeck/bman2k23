@@ -38,7 +38,11 @@ cc_library(
       "game.h",
       "timer.h"
    ],
-   deps = [":level_proto_cc", ":point"],
+   deps = [
+       ":level_proto_cc",
+       ":point",
+       "@com_github_glog_glog//:glog",
+       ],
 )
 
 cc_test(
@@ -46,6 +50,21 @@ cc_test(
    srcs = ["game_test.cc"],
    deps = [":game"],
    linkopts = ['-lgtest -lglog']
+)
+
+cc_library(
+   name = "agent",
+   srcs = [
+        "agent.h",
+        "simple_agent.h",
+        "simple_agent.cc",
+   ],
+   defines = ["BAZEL_BUILD"],
+   deps = [
+      ":level_proto_cc",
+      "@com_github_glog_glog//:glog",
+      ":game",
+   ],
 )
 
 cc_binary(
@@ -80,6 +99,7 @@ cc_binary(
     deps = [
         "@com_github_gflags_gflags//:gflags",
         "@com_github_glog_glog//:glog",
+        ":agent",
         ":level_proto_cc",
         ":game",
         ":bman_client",

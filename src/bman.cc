@@ -1,11 +1,14 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 
+#include "agent.h"
 #include "bman_client.h"
 #include "game.h"
 #include "glog/logging.h"
 #include "level.grpc.pb.h"
+#include "simple_agent.h"
 #include "timer.h"
+
 #include <gflags/gflags.h>
 #include <iostream>
 #include <memory>
@@ -17,10 +20,45 @@ static constexpr int kGridSize = 32;
 static constexpr int kOffsetX = 48;
 static constexpr int kOffsetY = 32;
 
+DEFINE_string(agent, "", "Name of agent to use");
 DEFINE_string(username, "[name]", "User name to use when connecting to server");
 DEFINE_string(server, "", "Server to connect to (with :port)");
 DEFINE_bool(stream, false, "Use streaming RPC");
 DEFINE_int32(client_delay, 0, "Introduce latency in the client request");
+
+class UserAgent : public Agent {
+public:
+  UserAgent(std::unordered_map<int, int>& keys) : keys_(keys) {}
+
+  bman::MovePlayerRequest GetPlayerAction(const bman::GameState&) {
+    char move_keys[5] = {'a', 'd', 'w', 's', ' '};
+    int dir = -1;
+    for (int i = 0; i < 4; ++i) {
+      if (keys_[move_keys[i]]) {
+        dir = i;
+        break;
+      }
+    }
+
+    bman::MovePlayerRequest move;
+    auto* action = move.add_actions();
+    if (dir >= 0) {
+      int dx = 0, dy = 0;
+      Agent::GetDeltaFromDir(dir, &dx, &dy);
+      action->set_dir(static_cast<bman::Direction>(dir));
+      action->set_dx(dx);
+      action->set_dy(dy);
+    }
+    if (keys_[move_keys[4]]) {
+      action->set_place_bomb(true);
+      keys_[move_keys[4]] = 0;
+    }
+    return move;
+  }
+
+private:
+  std::unordered_map<int, int>& keys_;
+};
 
 // A class to help manage the Player texture.
 class PlayerTexture {
@@ -243,29 +281,39 @@ public:
       LOG(FATAL) << "Failed to load the renderer";
     }
 
+    bman::GameConfig config;
+    int player_index = 0;
     if (!FLAGS_server.empty()) {
       client_ = bman::Client::Create(FLAGS_server, FLAGS_client_delay);
       auto response = client_->Join(FLAGS_username);
-      game_renderer_.set_config(response.game_config());
+      config = response.game_config();
+      player_index = response.player_index();
     } else {
       game_.BuildSimpleLevel(2);
       game_.AddPlayer();
-      game_renderer_.set_config(game_.config());
+      config = game_.config();
+    }
+    game_renderer_.set_config(config);
+
+    if (FLAGS_agent.empty()) {
+      agent_.reset(new UserAgent(keys_));
+    } else {
+      agent_.reset(new SimpleAgent(config, player_index));
     }
   }
 
   void Loop() {
+    bman::GameState state;
+
     while (true) {
       bman::Timer timer;
       HandleInput();
 
       // Process input to get user action.
       std::vector<bman::MovePlayerRequest> moves = {
-          GetPlayerActionFromKeyboard()};
-
+          agent_->GetPlayerAction(state)};
       // Send the move to server (or advance local game) and get
       // game state so we can render it.
-      bman::GameState state;
       if (client_) {
         state = FLAGS_stream
                     ? client_->StreamingMovePlayer(moves[0]).game_state()
@@ -280,32 +328,6 @@ public:
 
       timer.Wait(1000 / 60);
     }
-  }
-
-  bman::MovePlayerRequest GetPlayerActionFromKeyboard() {
-    char move_keys[5] = {'a', 'd', 'w', 's', ' '};
-    int dir = -1;
-    for (int i = 0; i < 4; ++i) {
-      if (keys_[move_keys[i]]) {
-        dir = i;
-        break;
-      }
-    }
-
-    bman::MovePlayerRequest move;
-    auto* action = move.add_actions();
-    if (dir >= 0) {
-      int dirs[4][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-      int speed = 4;
-      action->set_dir(static_cast<bman::Direction>(dir));
-      action->set_dx(speed * dirs[dir][0]);
-      action->set_dy(speed * dirs[dir][1]);
-    }
-    if (keys_[move_keys[4]]) {
-      action->set_place_bomb(true);
-      keys_[move_keys[4]] = 0;
-    }
-    return move;
   }
 
   // Read and process any pending SDL events
@@ -341,6 +363,7 @@ private:
   Game game_;
   std::unique_ptr<bman::Client> client_;
   std::unordered_map<int, int> keys_;
+  std::unique_ptr<Agent> agent_;
 };
 
 int main(int ac, char* av[]) {

@@ -12,15 +12,6 @@
 #include "math.h"
 #include "point.h"
 
-struct PointHash {
-  size_t operator()(const std::pair<int32_t, int32_t>& point) const {
-    return point.first * 1024 + point.second;
-  }
-  size_t operator()(const Point2i& point) const {
-    return point.x * 1024 + point.y;
-  }
-};
-
 typedef std::unordered_map<Point2i, bman::LevelState::Bomb*, PointHash> BombMap;
 typedef std::unordered_map<Point2i, bman::LevelState::Brick*, PointHash>
     BrickMap;
@@ -96,7 +87,7 @@ public:
       return false;
     }
     // Build map of bombs and bricks
-    BombMap bomb_map = MakeBombMap();
+    BombMap bomb_map = MakeBombMap(game_state_);
     BrickMap brick_map;
     for (auto& brick : *game_state_.mutable_level()->mutable_bricks()) {
       brick_map[Point2i(brick.x(), brick.y())] = &brick;
@@ -109,7 +100,7 @@ public:
       for (const auto& bomb : new_bombs) {
         *game_state_.mutable_level()->add_bombs() = bomb;
       }
-      bomb_map = MakeBombMap();
+      bomb_map = MakeBombMap(game_state_);
     }
 
     // Decrement timer on any active explosions
@@ -148,6 +139,23 @@ public:
         y >= config.level_height())
       return true;
     return (x % 2 == 1 && y % 2 == 1);
+  }
+
+  static BombMap MakeBombMap(bman::GameState& game_state) {
+    BombMap bomb_map = {};
+    if (bomb_map.size()) {
+      VLOG(2) << bomb_map.size();
+    }
+    for (int i = 0; i < game_state.level().bombs_size(); ++i) {
+      auto* b = game_state.mutable_level()->mutable_bombs(i);
+      bomb_map[Point2i(b->x(), b->y())] = b;
+    }
+    return bomb_map;
+    for (auto& bomb : *game_state.mutable_level()->mutable_bombs()) {
+      LOG(INFO) << bomb.x() << " " << bomb.y();
+      bomb_map[Point2i(bomb.x(), bomb.y())] = &bomb;
+    }
+    return bomb_map;
   }
 
 private:
@@ -295,14 +303,6 @@ private:
       bomb.set_player_id(player_index);
       player->set_num_used_bombs(player->num_used_bombs() + 1);
     }
-  }
-
-  BombMap MakeBombMap() {
-    BombMap bomb_map;
-    for (auto& bomb : *game_state_.mutable_level()->mutable_bombs()) {
-      bomb_map[Point2i(bomb.x(), bomb.y())] = &bomb;
-    }
-    return bomb_map;
   }
 
   void RemoveInactiveExplosions() {
