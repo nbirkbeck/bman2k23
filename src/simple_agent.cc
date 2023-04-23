@@ -11,11 +11,10 @@ struct Option {
 };
 
 bman::MovePlayerRequest
-SimpleAgent::GetPlayerAction(const bman::GameState& game_state_const) {
-  bman::GameState game_state(game_state_const);
+SimpleAgent::GetPlayerAction(const bman::GameState& game_state) {
   // If no plan, or reached new milestone (reconsider)
-  LOG(INFO) << game_state_const.players_size() << " "
-            << game_state.players_size() << " " << player_index_;
+  LOG(INFO) << game_state.players_size() << " " << game_state.players_size()
+            << " " << player_index_;
 
   bman::MovePlayerRequest move;
   if (!game_state.players_size() ||
@@ -35,6 +34,7 @@ SimpleAgent::GetPlayerAction(const bman::GameState& game_state_const) {
   Point2i pos(GridRound(player.x()), GridRound(player.y()));
   bool reached_waypoint = false;
   bool place_bomb = false;
+  GridMap grid_map(game_config_, game_state);
 
   int cx = player.x() - pos.x * kSubpixelSize;
   int cy = player.y() - pos.y * kSubpixelSize;
@@ -46,14 +46,14 @@ SimpleAgent::GetPlayerAction(const bman::GameState& game_state_const) {
     if (place_bomb) {
       // Place a bomb (in our local copy) to avoid killing ourself on upcoming
       // plan
-      auto* bomb = game_state.mutable_level()->add_bombs();
-      bomb->set_x(pos.x);
-      bomb->set_y(pos.y);
+      grid_map.PlaceBomb(pos, player_index_);
     }
   }
 
   // If next point is obstructed, replan
-  MaybeCreateNewPlan(reached_waypoint, game_state, pos);
+  MaybeCreateNewPlan(reached_waypoint, grid_map, pos,
+                     game_state.players(player_index_).strength());
+
   if (!plan_.size()) {
     LOG(WARNING) << "No valid plan!";
     move.add_actions();
@@ -62,8 +62,12 @@ SimpleAgent::GetPlayerAction(const bman::GameState& game_state_const) {
   Point2i desired_pos(plan_.front().pos.x * kSubpixelSize + kSubpixelSize / 2,
                       plan_.front().pos.y * kSubpixelSize + kSubpixelSize / 2);
   Point2i delta = desired_pos - Point2i(player.x(), player.y());
-  const int dir = Agent::GetDirFromDelta(delta.x, delta.y);
+  int dir = Agent::GetDirFromDelta(delta.x, delta.y);
   GetDeltaFromDir(dir, &delta.x, &delta.y);
+
+  if (grid_map.IsExplosion(plan_.front().pos)) {
+    dir = -1;
+  }
 
   if (dir >= 0) {
     auto* action = move.add_actions();
@@ -80,30 +84,18 @@ SimpleAgent::GetPlayerAction(const bman::GameState& game_state_const) {
 }
 
 std::unordered_set<Point2i, PointHash>
-SimpleAgent::FindNoGoZones(const BrickMap& brick_map, const BombMap& bomb_map) {
+SimpleAgent::FindNoGoZones(const GridMap& grid_map) {
 
   std::unordered_map<Point2i, int, PointHash> component;
   std::vector<std::vector<Point2i>> component_points;
   auto& config = game_config_;
-  auto is_solid = [&config, &brick_map, &bomb_map](const Point2i& pt) {
-    if (Game::IsStaticBrick(config, pt.x, pt.y)) {
-      return true;
-    }
-    if (bomb_map.count(pt)) {
-      return true;
-    }
-    if (brick_map.count(pt) && brick_map.at(pt)->solid()) {
-      return true;
-    }
-    return false;
-  };
 
   for (int y = 0; y < config.level_height(); ++y) {
     for (int x = 0; x < config.level_width(); ++x) {
       Point2i pos(x, y);
       if (component.count(pos))
         continue;
-      if (is_solid(pos))
+      if (!grid_map.CanMove(pos))
         continue;
 
       std::deque<Point2i> queue;
@@ -120,7 +112,7 @@ SimpleAgent::FindNoGoZones(const BrickMap& brick_map, const BombMap& bomb_map) {
 
         for (const auto& n : neigh) {
           const Point2i other = cur + n;
-          if (!is_solid(other) && !component.count(other)) {
+          if (grid_map.CanMove(other) && !component.count(other)) {
             queue.push_back(other);
             component[other] = component_points.size();
           }
@@ -144,8 +136,8 @@ SimpleAgent::FindNoGoZones(const BrickMap& brick_map, const BombMap& bomb_map) {
 }
 
 void SimpleAgent::MaybeCreateNewPlan(bool reached_waypoint,
-                                     bman::GameState& game_state,
-                                     const Point2i& pos) {
+                                     const GridMap& grid_map,
+                                     const Point2i& pos, int player_strength) {
   // Do a BFS
   // Score each grid point
   //   Score is number of points you would get
@@ -157,9 +149,7 @@ void SimpleAgent::MaybeCreateNewPlan(bool reached_waypoint,
   // Neighbors.
   const Point2i neigh[4] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
-  BombMap bomb_map = Game::MakeBombMap(game_state);
-  LOG(INFO) << bomb_map.size();
-  if (plan_.size() && bomb_map.count(plan_.front().pos)) {
+  if (plan_.size() && grid_map.HasBomb(plan_.front().pos)) {
     plan_.clear();
   }
   if (!(plan_.empty() ||
@@ -167,12 +157,7 @@ void SimpleAgent::MaybeCreateNewPlan(bool reached_waypoint,
     // TODO replan occasionally
     return;
   }
-  BrickMap brick_map;
-  for (auto& brick : *game_state.mutable_level()->mutable_bricks()) {
-    brick_map[Point2i(brick.x(), brick.y())] = &brick;
-  }
-
-  auto no_go = FindNoGoZones(brick_map, bomb_map);
+  auto no_go = FindNoGoZones(grid_map);
 
   std::unordered_map<Point2i, Point2i, PointHash> prev_map;
   std::unordered_map<Point2i, int, PointHash> depth_map;
@@ -189,7 +174,7 @@ void SimpleAgent::MaybeCreateNewPlan(bool reached_waypoint,
 
     Option option;
     option.pos = cur;
-    if (brick_map.count(cur) && brick_map.at(cur)->has_powerup()) {
+    if (grid_map.HasPowerup(cur)) {
       option.score += kPointsPowerUp;
       option.has_powerup = true;
     }
@@ -205,12 +190,12 @@ void SimpleAgent::MaybeCreateNewPlan(bool reached_waypoint,
         continue;
       }
 
-      if (bomb_map.count(new_point)) {
+      if (grid_map.HasBomb(new_point)) {
         option.score -= 2;
         continue;
       }
 
-      if (brick_map.count(new_point) && brick_map.at(new_point)->solid()) {
+      if (grid_map.HasSolidBrick(new_point)) {
         option.score += kPointsBrick;
         option.num_bricks++;
         continue;
@@ -222,11 +207,11 @@ void SimpleAgent::MaybeCreateNewPlan(bool reached_waypoint,
         queue.push_back(new_point);
       }
 
-      // Update score with any other bricks in this directiont hat would get
+      // Update score with any other bricks in this direction hat would get
       // hit.
-      for (int k = 2; k <= game_state.players(player_index_).strength(); ++k) {
+      for (int k = 2; k <= player_strength; ++k) {
         new_point = new_point + neigh[n];
-        if (brick_map.count(new_point) && brick_map.at(new_point)->solid()) {
+        if (grid_map.HasSolidBrick(new_point)) {
           option.score += kPointsBrick;
           option.num_bricks++;
           break;

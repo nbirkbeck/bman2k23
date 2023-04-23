@@ -13,8 +13,12 @@
 #include "point.h"
 
 typedef std::unordered_map<Point2i, bman::LevelState::Bomb*, PointHash> BombMap;
+typedef std::unordered_map<Point2i, const bman::LevelState::Bomb*, PointHash>
+    BombMapConst;
 typedef std::unordered_map<Point2i, bman::LevelState::Brick*, PointHash>
     BrickMap;
+typedef std::unordered_map<Point2i, const bman::LevelState::Brick*, PointHash>
+    BrickMapConst;
 
 class Game {
 public:
@@ -157,16 +161,14 @@ public:
 
   static BombMap MakeBombMap(bman::GameState& game_state) {
     BombMap bomb_map = {};
-    if (bomb_map.size()) {
-      VLOG(2) << bomb_map.size();
-    }
-    for (int i = 0; i < game_state.level().bombs_size(); ++i) {
-      auto* b = game_state.mutable_level()->mutable_bombs(i);
-      bomb_map[Point2i(b->x(), b->y())] = b;
+    for (auto& bomb : *game_state.mutable_level()->mutable_bombs()) {
+      bomb_map[Point2i(bomb.x(), bomb.y())] = &bomb;
     }
     return bomb_map;
-    for (auto& bomb : *game_state.mutable_level()->mutable_bombs()) {
-      LOG(INFO) << bomb.x() << " " << bomb.y();
+  }
+  static BombMapConst MakeBombMap(const bman::GameState& game_state) {
+    BombMapConst bomb_map = {};
+    for (const auto& bomb : game_state.level().bombs()) {
       bomb_map[Point2i(bomb.x(), bomb.y())] = &bomb;
     }
     return bomb_map;
