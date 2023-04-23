@@ -76,6 +76,7 @@ message LevelState {
     }
     repeated Point points = 1;
     optional int32 timer = 2;
+    optional int32 player_id = 3;
   }
   repeated Explosion explosions = 3;
 }

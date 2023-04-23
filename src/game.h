@@ -106,6 +106,19 @@ public:
     // Decrement timer on any active explosions
     for (auto& explosion : *game_state_.mutable_level()->mutable_explosions()) {
       explosion.set_timer(explosion.timer() - 1);
+      // Do damage to any player.
+      if (explosion.timer() > 0) {
+        for (int player_index = 0; player_index < game_state_.players_size();
+             player_index++) {
+          auto* player = game_state_.mutable_players(player_index);
+          Point2i player_pos(GridRound(player->x()), GridRound(player->y()));
+          for (const auto& point : explosion.points()) {
+            if (Point2i(point.x(), point.y()) == player_pos) {
+              MaybeDoDamage(*player, player_index, explosion.player_id());
+            }
+          }
+        }
+      }
     }
 
     // Go through any bombs and decrement timer.
@@ -114,6 +127,7 @@ public:
       bomb.set_timer(bomb.timer() - 1);
       if (active && bomb.timer() <= 0) {
         auto* explosion = game_state_.mutable_level()->add_explosions();
+        explosion->set_player_id(bomb.player_id());
         ExplodeBomb(bomb_map, brick_map, &bomb, explosion);
       }
     }
@@ -374,22 +388,7 @@ private:
           const int max_y = min_y;
           if (min_x <= point.x && point.x <= max_x && min_y <= point.y &&
               point.y <= max_y) {
-            player.set_health(player.health() - 1);
-            if (player.health() <= 0) {
-              LOG(INFO) << "Player " << player_index << " is dead\n";
-              player.set_state(bman::PlayerState::STATE_DYING);
-              player.set_anim_counter(0);
-
-              if (bomb->player_id() == player_index) {
-                game_state_.set_score(player_index,
-                                      game_state_.score(player_index) -
-                                          kPointsKill);
-              } else {
-                game_state_.set_score(bomb->player_id(),
-                                      game_state_.score(player_index) +
-                                          kPointsKill);
-              }
-            }
+            MaybeDoDamage(player, player_index, bomb->player_id());
           }
           player_index++;
         }
@@ -408,6 +407,26 @@ private:
             ExplodeBomb(bomb_map, brick_map, bomb_map.at(point), explosion);
           }
           break;
+        }
+      }
+    }
+  }
+
+  void MaybeDoDamage(bman::PlayerState& player, int player_index,
+                     int bomb_player_id) {
+    if (player.health() > 0) {
+      player.set_health(player.health() - 1);
+      if (player.health() <= 0) {
+        LOG(INFO) << "Player " << player_index << " is dead\n";
+        player.set_state(bman::PlayerState::STATE_DYING);
+        player.set_anim_counter(0);
+
+        if (bomb_player_id == player_index) {
+          game_state_.set_score(player_index,
+                                game_state_.score(player_index) - kPointsKill);
+        } else {
+          game_state_.set_score(
+              bomb_player_id, game_state_.score(bomb_player_id) + kPointsKill);
         }
       }
     }
