@@ -32,7 +32,7 @@ message PlayerState {
   optional int32 num_bombs = 5;
   optional int32 num_used_bombs = 9;
   optional int32 strength = 6;
-  optional bool has_detonator = 7;
+  optional Powerup powerup = 7;
   optional int32 health = 8;
   enum State {
     STATE_ALIVE = 0;
@@ -63,6 +63,9 @@ message LevelState {
     optional int32 strength = 3;
     optional int32 player_id = 4;
     optional int32 timer = 5;
+    optional Direction dir = 6;
+    optional int32 moving_x = 7;
+    optional int32 moving_y = 8;
   }
   repeated Bomb bombs = 2;
 
@@ -132,6 +135,7 @@ message MovePlayerRequest {
     optional int32 dy = 3;
     optional Direction dir = 4;
     optional bool place_bomb = 5;
+    optional bool use_powerup = 6;
   }
 
   repeated Action actions = 4;

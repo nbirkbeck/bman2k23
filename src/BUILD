@@ -36,7 +36,10 @@ cc_library(
       "constants.h",
       "math.h",
       "game.h",
-      "timer.h"
+      "timer.h",
+      "types.h",
+      "grid_map.h",
+      "grid_map.cc"
    ],
    deps = [
        ":level_proto_cc",
@@ -63,7 +66,7 @@ cc_library(
    deps = [
       ":level_proto_cc",
       "@com_github_glog_glog//:glog",
-      ":game",
+       ":game",
    ],
 )
 

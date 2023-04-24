@@ -16,5 +16,7 @@ const int kPointsPowerUp = 10;
 const int kPointsBrick = 1;
 
 const int kAgentSpeed = 4;
+const int kBombSpeed = 3;
 
+static constexpr int kDirs[4][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 #endif

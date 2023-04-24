@@ -9,16 +9,10 @@
 #include <unordered_map>
 
 #include "constants.h"
+#include "grid_map.h"
 #include "math.h"
 #include "point.h"
-
-typedef std::unordered_map<Point2i, bman::LevelState::Bomb*, PointHash> BombMap;
-typedef std::unordered_map<Point2i, const bman::LevelState::Bomb*, PointHash>
-    BombMapConst;
-typedef std::unordered_map<Point2i, bman::LevelState::Brick*, PointHash>
-    BrickMap;
-typedef std::unordered_map<Point2i, const bman::LevelState::Brick*, PointHash>
-    BrickMapConst;
+#include "types.h"
 
 class Game {
 public:
@@ -36,6 +30,13 @@ public:
     auto* level_state = config_.mutable_level_state();
     int num = 0;
     int num_powerups = 0;
+    if (true) {
+      auto* brick = level_state->add_bricks();
+      brick->set_x(1);
+      brick->set_y(0);
+      brick->set_powerup(bman::PUP_KICK);
+    }
+
     for (int y = padding; y < kDefaultHeight - padding; ++y) {
       for (int x = padding; x < kDefaultWidth - padding; ++x) {
         if (!IsStaticBrick(x, y)) {
@@ -106,6 +107,7 @@ public:
       }
       bomb_map = MakeBombMap(game_state_);
     }
+    GridMap grid_map(config_, game_state_);
 
     // Decrement timer on any active explosions
     for (auto& explosion : *game_state_.mutable_level()->mutable_explosions()) {
@@ -133,6 +135,28 @@ public:
         auto* explosion = game_state_.mutable_level()->add_explosions();
         explosion->set_player_id(bomb.player_id());
         ExplodeBomb(bomb_map, brick_map, &bomb, explosion);
+      } else if (active && bomb.has_dir()) {
+
+        // This should use all the possible reasons that grid point could be
+        // fixed.
+        Point2i next_point(
+            GridRound(bomb.moving_x() +
+                      (kSubpixelSize / 2 + 1) * kDirs[bomb.dir()][0]),
+            GridRound(bomb.moving_y() +
+                      (kSubPixelSize / 2 + 1) * kDirs[bomb.dir()][1]));
+        Point2i cur_point(bomb.x(), bomb.y());
+        if (next_point == cur_point || grid_map.CanMove(next_point)) {
+          bomb.set_moving_x(bomb.moving_x() +
+                            kBombSpeed * kDirs[bomb.dir()][0]);
+          bomb.set_moving_y(bomb.moving_y() +
+                            kBombSpeed * kDirs[bomb.dir()][1]);
+          bomb.set_x(GridRound(bomb.moving_x()));
+          bomb.set_y(GridRound(bomb.moving_y()));
+        } else {
+          bomb.clear_moving_x();
+          bomb.clear_moving_y();
+          bomb.clear_dir();
+        }
       }
     }
 
@@ -273,6 +297,31 @@ private:
         if (brick_map.count(new_pt)) {
           PlayerGivePowerup(player, player_index, brick_map.at(new_pt));
         }
+
+        // If player is using power-up, do it.
+        if (action.use_powerup()) {
+          if (player->powerup() == bman::PUP_KICK) {
+            bman::LevelState::Bomb* bomb = nullptr;
+            if (bomb_map.count(cur)) {
+              bomb = const_cast<bman::LevelState::Bomb*>(bomb_map.at(cur));
+            } else {
+              Point2i adj_point(
+                  GridRound(player->x() +
+                            kDirs[player->dir()][0] * kSubpixelSize / 2),
+                  GridRound(player->y() +
+                            kDirs[player->dir()][1] * kSubpixelSize / 2));
+              if (bomb_map.count(adj_point)) {
+                bomb =
+                    const_cast<bman::LevelState::Bomb*>(bomb_map.at(adj_point));
+              }
+            }
+            if (bomb) {
+              bomb->set_dir(player->dir());
+              bomb->set_moving_x(bomb->x() * kSubpixelSize + kSubpixelSize / 2);
+              bomb->set_moving_y(bomb->y() * kSubpixelSize + kSubpixelSize / 2);
+            }
+          }
+        }
       }
       player_index++;
     }
@@ -295,9 +344,10 @@ private:
           player->set_strength(player->strength() + 1);
           break;
         case bman::PUP_KICK:
+          player->set_powerup(bman::PUP_KICK);
           break;
         case bman::PUP_DETONATOR:
-          player->set_has_detonator(true);
+          player->set_powerup(bman::PUP_DETONATOR);
           break;
         default:
           break;

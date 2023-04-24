@@ -31,7 +31,7 @@ public:
   UserAgent(std::unordered_map<int, int>& keys) : keys_(keys) {}
 
   bman::MovePlayerRequest GetPlayerAction(const bman::GameState&) {
-    char move_keys[5] = {'a', 'd', 'w', 's', ' '};
+    char move_keys[6] = {'a', 'd', 'w', 's', ' ', 'f'};
     int dir = -1;
     for (int i = 0; i < 4; ++i) {
       if (keys_[move_keys[i]]) {
@@ -52,6 +52,11 @@ public:
     if (keys_[move_keys[4]]) {
       action->set_place_bomb(true);
       keys_[move_keys[4]] = 0;
+    }
+    if (keys_[move_keys[5]]) {
+      LOG(INFO) << "Using powerup";
+      action->set_use_powerup(true);
+      keys_[move_keys[5]] = 0;
     }
     return move;
   }
@@ -231,9 +236,17 @@ public:
   void DrawBomb(const bman::LevelState::Bomb& bomb, SDL_Surface* dest) {
     SDL_Rect src_rect = {kGridSize * ((bomb.timer() / 16) % 4), 0, kGridSize,
                          kGridSize};
-    SDL_Rect dest_rect = {kOffsetX + bomb.x() * kGridSize,
-                          kOffsetY + bomb.y() * kGridSize, kGridSize,
-                          kGridSize};
+    SDL_Rect dest_rect = {
+        bomb.has_moving_x()
+            ? (kOffsetX + bomb.moving_x() * kGridSize / kSubpixelSize -
+               kGridSize / 2)
+            : (kOffsetX + bomb.x() * kGridSize),
+        bomb.has_moving_y()
+            ? (kOffsetY + bomb.moving_y() * kGridSize / kSubpixelSize -
+               kGridSize / 2)
+            : (kOffsetY + bomb.y() * kGridSize),
+        kGridSize, kGridSize};
+
     SDL_BlitScaled(bomb_, &src_rect, dest, &dest_rect);
   }
 

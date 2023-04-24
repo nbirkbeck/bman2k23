@@ -1,6 +1,9 @@
 #ifndef _POINT_H_
 #define _POINT_H_ 1
 
+#include <algorithm>
+#include <cstddef>
+
 template <typename T> class Point2 {
 public:
   Point2(const T& _x = 0, const T& _y = 0) : x(_x), y(_y) {}
