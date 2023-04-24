@@ -34,7 +34,7 @@ public:
       auto* brick = level_state->add_bricks();
       brick->set_x(1);
       brick->set_y(0);
-      brick->set_powerup(bman::PUP_KICK);
+      brick->set_powerup(bman::PUP_SPEED);
 
       brick = level_state->add_bricks();
       brick->set_x(0);
@@ -217,7 +217,9 @@ private:
     for (auto& move : move_requests) {
       for (auto& action : move.actions()) {
         auto* player = game_state_.mutable_players(player_index);
-        const Point2i delta(action.dx(), action.dy());
+        int speed_multiplier = (player->powerup() == bman::PUP_SPEED) ? 2 : 1;
+        const Point2i delta(speed_multiplier * action.dx(),
+                            speed_multiplier * action.dy());
         Point2i min_delta(0, 0);
         int x = player->x(), y = player->y();
         Point2i other(0, 0);
@@ -362,6 +364,9 @@ private:
           break;
         case bman::PUP_DEATH:
           MaybeDoDamage(*player, player_index);
+          break;
+        case bman::PUP_SPEED:
+          player->set_powerup(bman::PUP_SPEED);
           break;
         case bman::PUP_EXTRA_BOMB:
           player->set_num_bombs(player->num_bombs() + 1);
