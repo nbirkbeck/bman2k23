@@ -40,6 +40,11 @@ public:
       brick->set_x(0);
       brick->set_y(1);
       brick->set_powerup(bman::PUP_DETONATOR);
+
+      brick = level_state->add_bricks();
+      brick->set_x(0);
+      brick->set_y(3);
+      brick->set_powerup(bman::PUP_DEATH);
     }
 
     for (int y = padding; y < kDefaultHeight - padding; ++y) {
@@ -355,6 +360,9 @@ private:
         switch (brick->powerup()) {
         case bman::PUP_NONE:
           break;
+        case bman::PUP_DEATH:
+          MaybeDoDamage(*player, player_index);
+          break;
         case bman::PUP_EXTRA_BOMB:
           player->set_num_bombs(player->num_bombs() + 1);
           break;
@@ -483,7 +491,7 @@ private:
   }
 
   void MaybeDoDamage(bman::PlayerState& player, int player_index,
-                     int bomb_player_id) {
+                     int bomb_player_id = -1) {
     if (player.health() > 0) {
       player.set_health(player.health() - 1);
       if (player.health() <= 0) {
@@ -491,7 +499,7 @@ private:
         player.set_state(bman::PlayerState::STATE_DYING);
         player.set_anim_counter(0);
 
-        if (bomb_player_id == player_index) {
+        if (bomb_player_id == -1 || bomb_player_id == player_index) {
           game_state_.set_score(player_index,
                                 game_state_.score(player_index) - kPointsKill);
         } else {
