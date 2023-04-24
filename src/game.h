@@ -35,6 +35,11 @@ public:
       brick->set_x(1);
       brick->set_y(0);
       brick->set_powerup(bman::PUP_KICK);
+
+      brick = level_state->add_bricks();
+      brick->set_x(0);
+      brick->set_y(1);
+      brick->set_powerup(bman::PUP_DETONATOR);
     }
 
     for (int y = padding; y < kDefaultHeight - padding; ++y) {
@@ -300,32 +305,46 @@ private:
 
         // If player is using power-up, do it.
         if (action.use_powerup()) {
-          if (player->powerup() == bman::PUP_KICK) {
-            bman::LevelState::Bomb* bomb = nullptr;
-            if (bomb_map.count(cur)) {
-              bomb = const_cast<bman::LevelState::Bomb*>(bomb_map.at(cur));
-            } else {
-              Point2i adj_point(
-                  GridRound(player->x() +
-                            kDirs[player->dir()][0] * kSubpixelSize / 2),
-                  GridRound(player->y() +
-                            kDirs[player->dir()][1] * kSubpixelSize / 2));
-              if (bomb_map.count(adj_point)) {
-                bomb =
-                    const_cast<bman::LevelState::Bomb*>(bomb_map.at(adj_point));
-              }
-            }
-            if (bomb) {
-              bomb->set_dir(player->dir());
-              bomb->set_moving_x(bomb->x() * kSubpixelSize + kSubpixelSize / 2);
-              bomb->set_moving_y(bomb->y() * kSubpixelSize + kSubpixelSize / 2);
-            }
-          }
+          PlayerUsePowerup(player, player_index, bomb_map);
         }
       }
       player_index++;
     }
     return new_bombs;
+  }
+
+  void PlayerUsePowerup(bman::PlayerState* player, int player_index,
+                        const BombMap& bomb_map) { // TODO(birkbeck): make it non-const
+    if (player->powerup() == bman::PUP_KICK) {
+      bman::LevelState::Bomb* bomb = nullptr;
+      Point2i cur(GridRound(player->x()), GridRound(player->y()));
+      if (bomb_map.count(cur)) {
+        bomb = const_cast<bman::LevelState::Bomb*>(bomb_map.at(cur));
+      } else {
+        Point2i adj_point(
+                          GridRound(player->x() +
+                                    kDirs[player->dir()][0] * kSubpixelSize / 2),
+                          GridRound(player->y() +
+                                    kDirs[player->dir()][1] * kSubpixelSize / 2));
+        if (bomb_map.count(adj_point)) {
+          bomb =
+            const_cast<bman::LevelState::Bomb*>(bomb_map.at(adj_point));
+        }
+      }
+      if (bomb) {
+        bomb->set_dir(player->dir());
+        bomb->set_moving_x(bomb->x() * kSubpixelSize + kSubpixelSize / 2);
+        bomb->set_moving_y(bomb->y() * kSubpixelSize + kSubpixelSize / 2);
+      }
+    } else if (player->powerup() == bman::PUP_DETONATOR) {
+      // Find the players earliest bomb and explode it.
+      for (auto& bomb : *game_state_.mutable_level()->mutable_bombs()) {
+        if (bomb.player_id() == player_index) {
+          bomb.set_timer(1);
+          break;
+        }
+      }
+    }
   }
 
   void PlayerGivePowerup(bman::PlayerState* player, int player_index,
