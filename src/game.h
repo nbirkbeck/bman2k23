@@ -313,22 +313,21 @@ private:
     return new_bombs;
   }
 
-  void PlayerUsePowerup(bman::PlayerState* player, int player_index,
-                        const BombMap& bomb_map) { // TODO(birkbeck): make it non-const
+  void PlayerUsePowerup(
+      bman::PlayerState* player, int player_index,
+      const BombMap& bomb_map) { // TODO(birkbeck): make it non-const
     if (player->powerup() == bman::PUP_KICK) {
       bman::LevelState::Bomb* bomb = nullptr;
       Point2i cur(GridRound(player->x()), GridRound(player->y()));
       if (bomb_map.count(cur)) {
         bomb = const_cast<bman::LevelState::Bomb*>(bomb_map.at(cur));
       } else {
-        Point2i adj_point(
-                          GridRound(player->x() +
-                                    kDirs[player->dir()][0] * kSubpixelSize / 2),
-                          GridRound(player->y() +
-                                    kDirs[player->dir()][1] * kSubpixelSize / 2));
+        Point2i adj_point(GridRound(player->x() + kDirs[player->dir()][0] *
+                                                      kSubpixelSize / 2),
+                          GridRound(player->y() + kDirs[player->dir()][1] *
+                                                      kSubpixelSize / 2));
         if (bomb_map.count(adj_point)) {
-          bomb =
-            const_cast<bman::LevelState::Bomb*>(bomb_map.at(adj_point));
+          bomb = const_cast<bman::LevelState::Bomb*>(bomb_map.at(adj_point));
         }
       }
       if (bomb) {
