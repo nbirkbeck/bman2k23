@@ -48,13 +48,6 @@ Run with a simple AI agent:
 ./bazel-bin/bman --agent simple
 ```
 
-Run with a simple AI agent:
-
-```
-./bazel-bin/bman --agent simple
-```
-
-
 Running a sever with two agents connected:
 
 ```
