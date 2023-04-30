@@ -18,5 +18,11 @@ const int kPointsBrick = 1;
 const int kAgentSpeed = 4;
 const int kBombSpeed = 3;
 
+static constexpr int kScreenWidth = 640;
+static constexpr int kScreenHeight = 480;
+static constexpr int kGridSize = 32;
+static constexpr int kOffsetX = 48;
+static constexpr int kOffsetY = 32;
+
 static constexpr int kDirs[4][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 #endif

@@ -30,7 +30,7 @@ public:
     auto* level_state = config_.mutable_level_state();
     int num = 0;
     int num_powerups = 0;
-    if (true) {
+    if (false) {
       auto* brick = level_state->add_bricks();
       brick->set_x(1);
       brick->set_y(0);
@@ -178,6 +178,7 @@ public:
     return true;
   }
 
+  void set_game_state(const bman::GameState& state) { game_state_ = state; }
   const bman::GameConfig& config() const { return config_; }
   const bman::GameState& game_state() const { return game_state_; }
   bman::GameState& game_state() { return game_state_; }
@@ -500,7 +501,7 @@ private:
     if (player.health() > 0) {
       player.set_health(player.health() - 1);
       if (player.health() <= 0) {
-        LOG(INFO) << "Player " << player_index << " is dead\n";
+        VLOG(2) << "Player " << player_index << " is dead\n";
         player.set_state(bman::PlayerState::STATE_DYING);
         player.set_anim_counter(0);
 

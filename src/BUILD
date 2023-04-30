@@ -9,7 +9,7 @@ DEPS = [
 package_group(
     name = "subpackages",
     packages = [
-        "//src/...",
+        "//...",
     ],
 )
 
@@ -41,6 +41,7 @@ cc_library(
       "grid_map.h",
       "grid_map.cc"
    ],
+   visibility = [":subpackages"],
    deps = [
        ":level_proto_cc",
        ":point",
@@ -62,6 +63,7 @@ cc_library(
         "simple_agent.h",
         "simple_agent.cc",
    ],
+   visibility = [":subpackages"],   
    defines = ["BAZEL_BUILD"],
    deps = [
       ":level_proto_cc",
@@ -93,6 +95,20 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "game_renderer",
+    srcs = [
+       "game_renderer.h",
+       "game_renderer.cc"
+    ],
+    visibility = [":subpackages"],
+    defines = ["BAZEL_BUILD"],
+    linkopts = ['-lSDL2 -lSDL2_ttf' ],
+    deps = [
+        ":level_proto_cc",
+        ":game",
+    ],
+)
 
 cc_binary(
     name = "bman",
@@ -106,5 +122,6 @@ cc_binary(
         ":level_proto_cc",
         ":game",
         ":bman_client",
+        ":game_renderer",
     ],
 )
