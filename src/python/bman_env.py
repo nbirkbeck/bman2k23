@@ -39,13 +39,14 @@ class BManGridEnv(gym.Env):
 
     # Compute reward as delta of score
     reward = score_after - score_before
-    reward += ((pos_before[0] - pos_after[0]) ** 2 + (pos_before[1] - pos_after[1]) ** 2) / 1000.0
+    if not self.game.player_is_dead():
+        reward += ((pos_before[0] - pos_after[0]) ** 2 + (pos_before[1] - pos_after[1]) ** 2) / 1000.0
 
     # Optionally we can pass additional info, we are not using that for now
     info = {'moved': action, 'score': score_after}
     access_map = self.game.get_map()
     done = self.game.player_is_dead()
-    if done: reward -= 5
+    # if done: reward -= 5
     return np.array(access_map.data()).reshape(access_map.h(), access_map.w()), reward , done, info
 
   def render(self, mode='console'):

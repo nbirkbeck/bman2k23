@@ -24,7 +24,7 @@ parser.add_argument('--train', type=int, help='Whether to train or not',
 args = parser.parse_args(sys.argv[1:])
 
 def callback(a1, a2):
-    if a1["infos"][0]["score"] > 10:
+    if a1["infos"][0]["score"] > 100:
         print(a1["infos"])
         return False
     #if a1["n_updates"] > 2140:
@@ -48,9 +48,8 @@ else:
     env = make_vec_env(lambda: env_raw, n_envs=4 if args.train else 1)
 
     if args.train:
-        env = VecFrameStack(env, n_stack=20)
+        env = VecFrameStack(env, n_stack=10)
     model = PPO('MlpPolicy', env, verbose=1)
-    #model = PPO('MaskableActorCriticPolicy', env, verbose=1)
     
 if args.train:
     model.learn(args.num_train_its, callback=callback)
@@ -71,8 +70,6 @@ env_raw.render_all = True
 n_steps = args.num_steps
 for step in range(n_steps):
   action, _ = model.predict(obs, deterministic=False)
-  print("Step {}".format(step + 1))
-  print("Action: ", action)
   obs, reward, done, info = env.step(action)
   if done:
       obs = env.reset()

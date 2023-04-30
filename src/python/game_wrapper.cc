@@ -3,6 +3,7 @@
 #include "agent.h"
 #include "game.h"
 #include "game_renderer.h"
+#include "timer.h"
 
 namespace py = pybind11;
 
@@ -112,7 +113,12 @@ public:
       action->set_use_powerup(true);
     }
     move_requests[0] = move;
-    return game_.Step(move_requests);
+    bool ret = true;
+    for (int i = 0; i < 8; ++i) {
+      ret &= game_.Step(move_requests);
+      move_requests[0].mutable_actions(0)->set_place_bomb(false);
+    }
+    return ret;
   }
 
   const bman::GameState& game_state() const {
@@ -162,10 +168,14 @@ public:
   }
 
   void DrawGame(const GameWrapper& game) {
+    bman::Timer timer;
+
     game_renderer_.set_config(game.config());
     HandleInput();
     game_renderer_.Draw(game.game_state(), SDL_GetWindowSurface(window_));
     SDL_UpdateWindowSurface(window_);
+
+    timer.Wait(4 * 1000 / 60);
   }
 
   // Read and process any pending SDL events
